@@ -1,9 +1,10 @@
 # coda-mcp
 
+[![CI](https://github.com/nkpar/coda-mcp/actions/workflows/ci.yml/badge.svg)](https://github.com/nkpar/coda-mcp/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Rust](https://img.shields.io/badge/rust-1.75+-orange.svg)](https://www.rust-lang.org)
 
-MCP (Model Context Protocol) server for [Coda.io](https://coda.io) API integration. Enables AI assistants to read and write Coda documents, tables, and data.
+MCP (Model Context Protocol) server for [Coda.io](https://coda.io) API. Enables AI assistants to read and write Coda documents, tables, and rows.
 
 ## Features
 
@@ -162,6 +163,13 @@ Coda API has rate limits:
 - **Writing**: 10 requests per 6 seconds
 
 Write operations return HTTP 202 (queued). Changes may take a few seconds to appear.
+
+## Security
+
+- API tokens are redacted from all log output
+- Download URLs validated against trusted hosts only (coda.io, codahosted.io, storage.googleapis.com)
+- Request limits capped at 1000 to prevent resource exhaustion
+- Install script uses silent input for tokens and sets restrictive file permissions (600)
 
 ## Development
 
