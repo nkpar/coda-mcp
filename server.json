@@ -1,0 +1,46 @@
+{
+  "$schema": "https://registry.modelcontextprotocol.io/v0.1/server.schema.json",
+  "name": "io.github.nkpar/coda",
+  "description": "MCP server for Coda.io API - enables AI assistants to read and write Coda documents, tables, and rows",
+  "repository": {
+    "url": "https://github.com/nkpar/coda-mcp",
+    "source": "github"
+  },
+  "packages": [
+    {
+      "registryType": "oci",
+      "identifier": "ghcr.io/nkpar/coda-mcp:latest",
+      "transport": {
+        "type": "stdio"
+      },
+      "environmentVariables": [
+        {
+          "name": "CODA_API_TOKEN",
+          "description": "Coda API token from coda.io/account",
+          "required": true,
+          "secret": true
+        }
+      ]
+    }
+  ],
+  "tools": [
+    {"name": "list_docs", "description": "List available Coda documents"},
+    {"name": "get_doc", "description": "Get document details"},
+    {"name": "search_docs", "description": "Search documents by name"},
+    {"name": "create_doc", "description": "Create a new document"},
+    {"name": "delete_doc", "description": "Delete a document (permanent)"},
+    {"name": "list_pages", "description": "List pages in a document"},
+    {"name": "get_page", "description": "Get page content (HTML)"},
+    {"name": "list_tables", "description": "List tables in a document"},
+    {"name": "get_table", "description": "Get table details"},
+    {"name": "list_columns", "description": "List columns in a table"},
+    {"name": "get_rows", "description": "Get rows with optional filtering"},
+    {"name": "get_row", "description": "Get a specific row"},
+    {"name": "add_row", "description": "Add a new row"},
+    {"name": "update_row", "description": "Update an existing row"},
+    {"name": "delete_row", "description": "Delete a row"},
+    {"name": "list_formulas", "description": "List named formulas"},
+    {"name": "get_formula", "description": "Get formula value"},
+    {"name": "list_controls", "description": "List controls (buttons, sliders)"}
+  ]
+}

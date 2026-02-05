@@ -1,0 +1,12 @@
+target/
+.git/
+.github/
+.env
+*.md
+!README.md
+LICENSE
+scripts/
+tests/
+.gitignore
+.dockerignore
+server.json

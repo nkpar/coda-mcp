@@ -70,6 +70,12 @@ Binary will be at `./target/release/coda-mcp`
 
 Check the [Releases](https://github.com/nkpar/coda-mcp/releases) page.
 
+### Docker
+
+```bash
+docker pull ghcr.io/nkpar/coda-mcp:latest
+```
+
 ### One-Click Install Script
 
 For Claude Desktop with automatic configuration:

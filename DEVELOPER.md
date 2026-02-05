@@ -216,7 +216,8 @@ lint → test ──┐
 **Release (`release.yml`)** - runs on version tags (`v*`):
 ```
 lint → test ──┐
-      security ┴→ build (3 targets) → publish → release
+      security ┴→ build (3 targets) ──┐
+               ┴→ docker (amd64+arm64) ┴→ publish → release
 ```
 
 **Job hierarchy:**
@@ -224,8 +225,9 @@ lint → test ──┐
 2. **Test** - cargo test (needs lint)
 3. **Security** - rustsec audit (needs lint, parallel with test)
 4. **Build** - release builds (needs test + security)
-5. **Publish** - crates.io via trusted publishing (needs build)
-6. **Release** - GitHub release with binaries (needs publish)
+5. **Docker** - multi-arch image to ghcr.io (needs test + security, parallel with build)
+6. **Publish** - crates.io via trusted publishing (needs build + docker)
+7. **Release** - GitHub release with binaries (needs publish)
 
 **Features:**
 - **Trusted publishing**: Uses OIDC via `rust-lang/crates-io-auth-action` - no API token secrets needed
@@ -241,4 +243,25 @@ git add Cargo.toml Cargo.lock
 git commit -m "chore: bump version to X.Y.Z"
 git tag vX.Y.Z
 git push origin main --tags
+```
+
+### Docker
+
+Multi-arch Docker images (amd64 + arm64) are published to GitHub Container Registry on each release:
+
+```bash
+# Pull and run
+docker run -e CODA_API_TOKEN=xxx ghcr.io/nkpar/coda-mcp:latest
+
+# Build locally
+docker build -t coda-mcp .
+```
+
+### MCP Registry
+
+The server is published to the [MCP Registry](https://registry.modelcontextprotocol.io/) via `server.json`. To publish updates:
+
+```bash
+mcp-publisher login github
+mcp-publisher publish
 ```

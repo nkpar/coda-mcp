@@ -14,6 +14,10 @@ cargo test
 # Run E2E tests against live Coda API (requires token)
 export $(cat .env | xargs) && cargo test --test e2e_tests -- --ignored
 
+# Run Docker E2E tests (requires Docker + token + image built)
+docker build -t coda-mcp:local .
+export $(cat .env | xargs) && cargo test --test docker_e2e -- --ignored
+
 # Run a single test
 cargo test test_name
 
@@ -51,6 +55,13 @@ This is an MCP (Model Context Protocol) server that enables AI assistants to int
 
 - **`tests/integration_tests.rs`** - Mock-based tests using `wiremock`
 - **`tests/e2e_tests.rs`** - Live API tests, marked `#[ignore]`, require `CODA_API_TOKEN`
+- **`tests/docker_e2e.rs`** - Docker E2E tests, marked `#[ignore]`, require Docker + `CODA_API_TOKEN` + `coda-mcp:local` image
+
+### Docker
+
+Multi-stage build: `rust:1.93-slim-bookworm` → `debian:bookworm-slim`. Uses dependency caching (dummy `main.rs` trick — must clean `.fingerprint/` to force recompilation of real source).
+
+CI publishes multi-arch images (amd64 + arm64) to `ghcr.io/nkpar/coda-mcp` on release tags.
 
 ### Security Boundaries
 
