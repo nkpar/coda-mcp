@@ -698,6 +698,36 @@ impl ServerHandler for CodaMcpServer {
     }
 }
 
+#[tokio::main]
+async fn main() -> anyhow::Result<()> {
+    // Initialize logging to stderr (MCP uses stdout for JSON-RPC)
+    let filter = EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info"));
+
+    tracing_subscriber::fmt()
+        .with_env_filter(filter)
+        .with_writer(std::io::stderr)
+        .with_ansi(false)
+        .init();
+
+    tracing::info!("Starting coda-mcp server v{}", env!("CARGO_PKG_VERSION"));
+
+    // Load configuration
+    let config = Config::from_env()?;
+    tracing::info!("Configuration loaded, base URL: {}", config.base_url);
+
+    // Create HTTP client
+    let client = Arc::new(CodaClient::new(&config));
+
+    // Create and run MCP server
+    let server = CodaMcpServer::new(client);
+    let service = server.serve(stdio()).await?;
+
+    tracing::info!("Server running, waiting for requests...");
+    service.waiting().await?;
+
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1680,34 +1710,4 @@ mod tests {
 
         assert!(result.is_err());
     }
-}
-
-#[tokio::main]
-async fn main() -> anyhow::Result<()> {
-    // Initialize logging to stderr (MCP uses stdout for JSON-RPC)
-    let filter = EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info"));
-
-    tracing_subscriber::fmt()
-        .with_env_filter(filter)
-        .with_writer(std::io::stderr)
-        .with_ansi(false)
-        .init();
-
-    tracing::info!("Starting coda-mcp server v{}", env!("CARGO_PKG_VERSION"));
-
-    // Load configuration
-    let config = Config::from_env()?;
-    tracing::info!("Configuration loaded, base URL: {}", config.base_url);
-
-    // Create HTTP client
-    let client = Arc::new(CodaClient::new(&config));
-
-    // Create and run MCP server
-    let server = CodaMcpServer::new(client);
-    let service = server.serve(stdio()).await?;
-
-    tracing::info!("Server running, waiting for requests...");
-    service.waiting().await?;
-
-    Ok(())
 }
