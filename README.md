@@ -74,11 +74,19 @@ Check the [Releases](https://github.com/nkpar/coda-mcp/releases) page.
 
 ### Docker
 
+No Rust toolchain required. Multi-arch image (amd64 + arm64), ~3MB.
+
 ```bash
 docker pull ghcr.io/nkpar/coda-mcp:latest
 ```
 
-Claude Desktop config for Docker:
+**Claude Code** (CLI):
+
+```bash
+claude mcp add coda -e CODA_API_TOKEN=your_token_here -- docker run --rm -i -e CODA_API_TOKEN ghcr.io/nkpar/coda-mcp:latest
+```
+
+**Claude Desktop** config:
 
 ```json
 {
@@ -132,7 +140,11 @@ Get your Coda API token from [coda.io/account](https://coda.io/account) → API 
 **Claude Code** (CLI):
 
 ```bash
+# Binary
 claude mcp add coda -e CODA_API_TOKEN=your_token_here -- $HOME/.cargo/bin/coda-mcp
+
+# Or via Docker (no Rust required)
+claude mcp add coda -e CODA_API_TOKEN=your_token_here -- docker run --rm -i -e CODA_API_TOKEN ghcr.io/nkpar/coda-mcp:latest
 ```
 
 Or via `.mcp.json` in project root:
