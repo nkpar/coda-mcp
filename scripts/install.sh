@@ -14,7 +14,8 @@ fi
 # 2. Install via cargo
 echo "Installing coda-mcp from crates.io..."
 cargo install coda-mcp
-echo "Install complete."
+BINARY_PATH="$HOME/.cargo/bin/coda-mcp"
+echo "Installed to: $BINARY_PATH"
 echo ""
 
 # 3. Find Claude Desktop config
@@ -55,12 +56,13 @@ mkdir -p "$CONFIG_DIR"
 
 if [ -f "$CONFIG_FILE" ]; then
     echo "Updating existing config..."
-    jq --arg token "$CODA_TOKEN" \
-       '.mcpServers.coda = {"command": "coda-mcp", "env": {"CODA_API_TOKEN": $token}}' \
+    jq --arg bin "$BINARY_PATH" --arg token "$CODA_TOKEN" \
+       '.mcpServers.coda = {"command": $bin, "env": {"CODA_API_TOKEN": $token}}' \
        "$CONFIG_FILE" > "$CONFIG_FILE.tmp" && mv "$CONFIG_FILE.tmp" "$CONFIG_FILE"
 else
     echo "Creating new config..."
-    echo '{"mcpServers":{"coda":{"command":"coda-mcp","env":{"CODA_API_TOKEN":"'"$CODA_TOKEN"'"}}}}' | jq . > "$CONFIG_FILE"
+    jq -n --arg bin "$BINARY_PATH" --arg token "$CODA_TOKEN" \
+       '{"mcpServers":{"coda":{"command": $bin, "env": {"CODA_API_TOKEN": $token}}}}' > "$CONFIG_FILE"
 fi
 
 # Secure the config file (contains sensitive token)

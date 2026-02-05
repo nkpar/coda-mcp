@@ -35,7 +35,7 @@ Add to `~/Library/Application Support/Claude/claude_desktop_config.json` (macOS)
 {
   "mcpServers": {
     "coda": {
-      "command": "coda-mcp",
+      "command": "/Users/YOUR_USERNAME/.cargo/bin/coda-mcp",
       "env": {
         "CODA_API_TOKEN": "your_token_here"
       }
