@@ -2,7 +2,7 @@
 
 [![CI](https://github.com/nkpar/coda-mcp/actions/workflows/ci.yml/badge.svg)](https://github.com/nkpar/coda-mcp/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Rust](https://img.shields.io/badge/rust-1.75+-orange.svg)](https://www.rust-lang.org)
+[![MSRV](https://img.shields.io/badge/MSRV-1.75-orange.svg)](https://www.rust-lang.org)
 
 MCP (Model Context Protocol) server for [Coda.io](https://coda.io) API. Enables AI assistants to read and write Coda documents, tables, and rows.
 
