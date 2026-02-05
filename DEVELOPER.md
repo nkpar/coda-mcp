@@ -177,6 +177,17 @@ RUST_LOG=info CODA_API_TOKEN=xxx ./target/release/coda-mcp 2>&1 | tee /tmp/coda-
 
 The client logs HTTP request URLs at INFO level when debugging. Response status is logged at DEBUG level.
 
+### Dependencies
+
+Tokio is configured with minimal features to reduce binary size:
+- `macros` - for `#[tokio::main]` and `#[tokio::test]`
+- `rt-multi-thread` - runtime
+- `time` - for `tokio::time::sleep` in export polling
+
+Other notable dependencies:
+- `flate2` - required for decompressing raw gzip from external URLs (reqwest's auto-decompression doesn't work for these)
+- `url` - required for security validation of download URLs
+
 ### Security
 
 The following security measures are implemented:
