@@ -9,8 +9,15 @@ use rmcp::{
 };
 use std::fmt::Write as _;
 
+#[cfg(not(test))]
 const MAX_POLL_ATTEMPTS: u32 = 30;
+#[cfg(not(test))]
 const POLL_INTERVAL_SECS: u64 = 1;
+
+#[cfg(test)]
+const MAX_POLL_ATTEMPTS: u32 = 3;
+#[cfg(test)]
+const POLL_INTERVAL_SECS: u64 = 0;
 use std::sync::Arc;
 use std::time::Duration;
 use tracing_subscriber::EnvFilter;
@@ -688,6 +695,990 @@ impl ServerHandler for CodaMcpServer {
                     .into(),
             ),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use wiremock::matchers::{header, method, path, query_param};
+    use wiremock::{Mock, MockServer, ResponseTemplate};
+
+    async fn setup() -> (CodaMcpServer, MockServer) {
+        let mock_server = MockServer::start().await;
+        let client = Arc::new(CodaClient::new_with_base_url(
+            "test_token",
+            &mock_server.uri(),
+        ));
+        let server = CodaMcpServer::new(client);
+        (server, mock_server)
+    }
+
+    // === Server Info ===
+
+    #[test]
+    fn test_get_info() {
+        let mock_client = CodaClient::new_with_base_url("tok", "http://localhost:0");
+        let server = CodaMcpServer::new(Arc::new(mock_client));
+        let info = server.get_info();
+        // from_build_env() uses the rmcp crate name, not our package name
+        assert!(!info.server_info.name.is_empty());
+        assert!(!info.server_info.version.is_empty());
+        assert!(info.instructions.is_some());
+        assert!(info.instructions.unwrap().contains("Coda.io MCP Server"));
+    }
+
+    // === Document Tools ===
+
+    #[tokio::test]
+    async fn test_list_docs_success() {
+        let (server, mock_server) = setup().await;
+
+        Mock::given(method("GET"))
+            .and(path("/docs"))
+            .and(query_param("limit", "50"))
+            .and(header("Authorization", "Bearer test_token"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                "items": [
+                    {"id": "doc1", "name": "Doc One"},
+                    {"id": "doc2", "name": "Doc Two"}
+                ]
+            })))
+            .mount(&mock_server)
+            .await;
+
+        let result = server
+            .list_docs(Parameters(ListDocsParams {
+                limit: None,
+                query: None,
+            }))
+            .await
+            .unwrap();
+
+        let text = &result.content[0].raw.as_text().unwrap().text;
+        assert!(text.contains("Found 2 documents"));
+        assert!(text.contains("Doc One"));
+    }
+
+    #[tokio::test]
+    async fn test_list_docs_with_query() {
+        let (server, mock_server) = setup().await;
+
+        Mock::given(method("GET"))
+            .and(path("/docs"))
+            .and(query_param("query", "project"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                "items": [{"id": "doc1", "name": "My Project"}]
+            })))
+            .mount(&mock_server)
+            .await;
+
+        let result = server
+            .list_docs(Parameters(ListDocsParams {
+                limit: Some(10),
+                query: Some("project".to_string()),
+            }))
+            .await
+            .unwrap();
+
+        let text = &result.content[0].raw.as_text().unwrap().text;
+        assert!(text.contains("Found 1 documents"));
+    }
+
+    #[tokio::test]
+    async fn test_list_docs_limit_capped_at_1000() {
+        let (server, mock_server) = setup().await;
+
+        Mock::given(method("GET"))
+            .and(path("/docs"))
+            .and(query_param("limit", "1000"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                "items": []
+            })))
+            .mount(&mock_server)
+            .await;
+
+        let result = server
+            .list_docs(Parameters(ListDocsParams {
+                limit: Some(5000),
+                query: None,
+            }))
+            .await
+            .unwrap();
+
+        let text = &result.content[0].raw.as_text().unwrap().text;
+        assert!(text.contains("Found 0 documents"));
+    }
+
+    #[tokio::test]
+    async fn test_list_docs_api_error() {
+        let (server, mock_server) = setup().await;
+
+        Mock::given(method("GET"))
+            .and(path("/docs"))
+            .respond_with(ResponseTemplate::new(401))
+            .mount(&mock_server)
+            .await;
+
+        let result = server
+            .list_docs(Parameters(ListDocsParams {
+                limit: None,
+                query: None,
+            }))
+            .await;
+
+        assert!(result.is_err());
+    }
+
+    #[tokio::test]
+    async fn test_get_doc_success() {
+        let (server, mock_server) = setup().await;
+
+        Mock::given(method("GET"))
+            .and(path("/docs/doc1"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                "id": "doc1",
+                "name": "Test Document"
+            })))
+            .mount(&mock_server)
+            .await;
+
+        let result = server
+            .get_doc(Parameters(GetDocParams {
+                doc_id: "doc1".to_string(),
+            }))
+            .await
+            .unwrap();
+
+        let text = &result.content[0].raw.as_text().unwrap().text;
+        assert!(text.contains("Document: Test Document"));
+    }
+
+    #[tokio::test]
+    async fn test_search_docs_success() {
+        let (server, mock_server) = setup().await;
+
+        Mock::given(method("GET"))
+            .and(path("/docs"))
+            .and(query_param("query", "hello"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                "items": [{"id": "d1", "name": "Hello World"}]
+            })))
+            .mount(&mock_server)
+            .await;
+
+        let result = server
+            .search_docs(Parameters(SearchDocsParams {
+                query: "hello".to_string(),
+            }))
+            .await
+            .unwrap();
+
+        let text = &result.content[0].raw.as_text().unwrap().text;
+        assert!(text.contains("Found 1 documents matching 'hello'"));
+    }
+
+    #[tokio::test]
+    async fn test_create_doc_success() {
+        let (server, mock_server) = setup().await;
+
+        Mock::given(method("POST"))
+            .and(path("/docs"))
+            .respond_with(ResponseTemplate::new(202).set_body_json(serde_json::json!({
+                "id": "new-doc",
+                "name": "My New Doc"
+            })))
+            .mount(&mock_server)
+            .await;
+
+        let result = server
+            .create_doc(Parameters(CreateDocParams {
+                title: "My New Doc".to_string(),
+                folder_id: None,
+                source_doc: None,
+                timezone: None,
+            }))
+            .await
+            .unwrap();
+
+        let text = &result.content[0].raw.as_text().unwrap().text;
+        assert!(text.contains("Document created successfully"));
+        assert!(text.contains("My New Doc"));
+    }
+
+    #[tokio::test]
+    async fn test_create_doc_with_all_options() {
+        let (server, mock_server) = setup().await;
+
+        Mock::given(method("POST"))
+            .and(path("/docs"))
+            .respond_with(ResponseTemplate::new(202).set_body_json(serde_json::json!({
+                "id": "new-doc",
+                "name": "From Template"
+            })))
+            .mount(&mock_server)
+            .await;
+
+        let result = server
+            .create_doc(Parameters(CreateDocParams {
+                title: "From Template".to_string(),
+                folder_id: Some("folder1".to_string()),
+                source_doc: Some("template1".to_string()),
+                timezone: Some("Europe/London".to_string()),
+            }))
+            .await
+            .unwrap();
+
+        let text = &result.content[0].raw.as_text().unwrap().text;
+        assert!(text.contains("Document created successfully"));
+    }
+
+    #[tokio::test]
+    async fn test_create_doc_api_error_returns_tool_error() {
+        let (server, mock_server) = setup().await;
+
+        Mock::given(method("POST"))
+            .and(path("/docs"))
+            .respond_with(ResponseTemplate::new(403))
+            .mount(&mock_server)
+            .await;
+
+        let result = server
+            .create_doc(Parameters(CreateDocParams {
+                title: "Forbidden".to_string(),
+                folder_id: None,
+                source_doc: None,
+                timezone: None,
+            }))
+            .await
+            .unwrap();
+
+        // create_doc returns CallToolResult::error, not Err
+        assert!(result.is_error.unwrap_or(false));
+    }
+
+    #[tokio::test]
+    async fn test_delete_doc_success() {
+        let (server, mock_server) = setup().await;
+
+        Mock::given(method("DELETE"))
+            .and(path("/docs/doc1"))
+            .respond_with(ResponseTemplate::new(202))
+            .mount(&mock_server)
+            .await;
+
+        let result = server
+            .delete_doc(Parameters(DeleteDocParams {
+                doc_id: "doc1".to_string(),
+            }))
+            .await
+            .unwrap();
+
+        let text = &result.content[0].raw.as_text().unwrap().text;
+        assert!(text.contains("deleted successfully"));
+    }
+
+    #[tokio::test]
+    async fn test_delete_doc_error_returns_tool_error() {
+        let (server, mock_server) = setup().await;
+
+        Mock::given(method("DELETE"))
+            .and(path("/docs/doc1"))
+            .respond_with(ResponseTemplate::new(404))
+            .mount(&mock_server)
+            .await;
+
+        let result = server
+            .delete_doc(Parameters(DeleteDocParams {
+                doc_id: "doc1".to_string(),
+            }))
+            .await
+            .unwrap();
+
+        assert!(result.is_error.unwrap_or(false));
+    }
+
+    // === Page Tools ===
+
+    #[tokio::test]
+    async fn test_list_pages_success() {
+        let (server, mock_server) = setup().await;
+
+        Mock::given(method("GET"))
+            .and(path("/docs/doc1/pages"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                "items": [
+                    {"id": "p1", "name": "Home"},
+                    {"id": "p2", "name": "About"}
+                ]
+            })))
+            .mount(&mock_server)
+            .await;
+
+        let result = server
+            .list_pages(Parameters(ListPagesParams {
+                doc_id: "doc1".to_string(),
+            }))
+            .await
+            .unwrap();
+
+        let text = &result.content[0].raw.as_text().unwrap().text;
+        assert!(text.contains("Found 2 pages"));
+    }
+
+    #[tokio::test]
+    async fn test_get_page_export_failed() {
+        let (server, mock_server) = setup().await;
+
+        // Step 1: Initiate export
+        Mock::given(method("POST"))
+            .and(path("/docs/doc1/pages/p1/export"))
+            .respond_with(ResponseTemplate::new(202).set_body_json(serde_json::json!({
+                "id": "exp1",
+                "status": "inProgress"
+            })))
+            .mount(&mock_server)
+            .await;
+
+        // Step 2: Poll returns failed
+        Mock::given(method("GET"))
+            .and(path("/docs/doc1/pages/p1/export/exp1"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                "id": "exp1",
+                "status": "failed",
+                "error": "Page too large"
+            })))
+            .mount(&mock_server)
+            .await;
+
+        let result = server
+            .get_page(Parameters(GetPageParams {
+                doc_id: "doc1".to_string(),
+                page_id: "p1".to_string(),
+            }))
+            .await;
+
+        assert!(result.is_err());
+        let err = result.unwrap_err();
+        assert!(err.message.contains("Export failed"));
+    }
+
+    #[tokio::test]
+    async fn test_get_page_complete_no_download_link() {
+        let (server, mock_server) = setup().await;
+
+        Mock::given(method("POST"))
+            .and(path("/docs/doc1/pages/p1/export"))
+            .respond_with(ResponseTemplate::new(202).set_body_json(serde_json::json!({
+                "id": "exp1",
+                "status": "inProgress"
+            })))
+            .mount(&mock_server)
+            .await;
+
+        Mock::given(method("GET"))
+            .and(path("/docs/doc1/pages/p1/export/exp1"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                "id": "exp1",
+                "status": "complete"
+            })))
+            .mount(&mock_server)
+            .await;
+
+        let result = server
+            .get_page(Parameters(GetPageParams {
+                doc_id: "doc1".to_string(),
+                page_id: "p1".to_string(),
+            }))
+            .await;
+
+        assert!(result.is_err());
+        let err = result.unwrap_err();
+        assert!(err.message.contains("no download link"));
+    }
+
+    // === Table Tools ===
+
+    #[tokio::test]
+    async fn test_list_tables_success() {
+        let (server, mock_server) = setup().await;
+
+        Mock::given(method("GET"))
+            .and(path("/docs/doc1/tables"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                "items": [
+                    {"id": "tbl1", "name": "Tasks", "rowCount": 42}
+                ]
+            })))
+            .mount(&mock_server)
+            .await;
+
+        let result = server
+            .list_tables(Parameters(ListTablesParams {
+                doc_id: "doc1".to_string(),
+            }))
+            .await
+            .unwrap();
+
+        let text = &result.content[0].raw.as_text().unwrap().text;
+        assert!(text.contains("Found 1 tables"));
+        assert!(text.contains("Tasks"));
+    }
+
+    #[tokio::test]
+    async fn test_get_table_success() {
+        let (server, mock_server) = setup().await;
+
+        Mock::given(method("GET"))
+            .and(path("/docs/doc1/tables/tbl1"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                "id": "tbl1",
+                "name": "Tasks",
+                "rowCount": 42
+            })))
+            .mount(&mock_server)
+            .await;
+
+        let result = server
+            .get_table(Parameters(GetTableParams {
+                doc_id: "doc1".to_string(),
+                table_id: "tbl1".to_string(),
+            }))
+            .await
+            .unwrap();
+
+        let text = &result.content[0].raw.as_text().unwrap().text;
+        assert!(text.contains("Table: Tasks"));
+    }
+
+    #[tokio::test]
+    async fn test_list_columns_success() {
+        let (server, mock_server) = setup().await;
+
+        Mock::given(method("GET"))
+            .and(path("/docs/doc1/tables/tbl1/columns"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                "items": [
+                    {"id": "col1", "name": "Name"},
+                    {"id": "col2", "name": "Status"}
+                ]
+            })))
+            .mount(&mock_server)
+            .await;
+
+        let result = server
+            .list_columns(Parameters(ListColumnsParams {
+                doc_id: "doc1".to_string(),
+                table_id: "tbl1".to_string(),
+            }))
+            .await
+            .unwrap();
+
+        let text = &result.content[0].raw.as_text().unwrap().text;
+        assert!(text.contains("Found 2 columns"));
+    }
+
+    // === Row Tools ===
+
+    #[tokio::test]
+    async fn test_get_rows_success() {
+        let (server, mock_server) = setup().await;
+
+        Mock::given(method("GET"))
+            .and(path("/docs/doc1/tables/tbl1/rows"))
+            .and(query_param("useColumnNames", "true"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                "items": [
+                    {"id": "r1", "name": "Row 1", "values": {"Name": "Alice"}},
+                    {"id": "r2", "name": "Row 2", "values": {"Name": "Bob"}}
+                ]
+            })))
+            .mount(&mock_server)
+            .await;
+
+        let result = server
+            .get_rows(Parameters(GetRowsParams {
+                doc_id: "doc1".to_string(),
+                table_id: "tbl1".to_string(),
+                limit: None,
+                query: None,
+            }))
+            .await
+            .unwrap();
+
+        let text = &result.content[0].raw.as_text().unwrap().text;
+        assert!(text.contains("Found 2 rows"));
+    }
+
+    #[tokio::test]
+    async fn test_get_rows_with_query() {
+        let (server, mock_server) = setup().await;
+
+        Mock::given(method("GET"))
+            .and(path("/docs/doc1/tables/tbl1/rows"))
+            .and(query_param("query", "Status:\"Active\""))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                "items": [{"id": "r1", "name": "Row 1", "values": {"Status": "Active"}}]
+            })))
+            .mount(&mock_server)
+            .await;
+
+        let result = server
+            .get_rows(Parameters(GetRowsParams {
+                doc_id: "doc1".to_string(),
+                table_id: "tbl1".to_string(),
+                limit: Some(10),
+                query: Some("Status:\"Active\"".to_string()),
+            }))
+            .await
+            .unwrap();
+
+        let text = &result.content[0].raw.as_text().unwrap().text;
+        assert!(text.contains("Found 1 rows"));
+    }
+
+    #[tokio::test]
+    async fn test_get_rows_limit_capped() {
+        let (server, mock_server) = setup().await;
+
+        Mock::given(method("GET"))
+            .and(path("/docs/doc1/tables/tbl1/rows"))
+            .and(query_param("limit", "1000"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                "items": []
+            })))
+            .mount(&mock_server)
+            .await;
+
+        let result = server
+            .get_rows(Parameters(GetRowsParams {
+                doc_id: "doc1".to_string(),
+                table_id: "tbl1".to_string(),
+                limit: Some(9999),
+                query: None,
+            }))
+            .await
+            .unwrap();
+
+        let text = &result.content[0].raw.as_text().unwrap().text;
+        assert!(text.contains("Found 0 rows"));
+    }
+
+    #[tokio::test]
+    async fn test_get_row_success() {
+        let (server, mock_server) = setup().await;
+
+        Mock::given(method("GET"))
+            .and(path("/docs/doc1/tables/tbl1/rows/r1"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                "id": "r1",
+                "name": "Row 1",
+                "values": {"Name": "Alice", "Score": 95}
+            })))
+            .mount(&mock_server)
+            .await;
+
+        let result = server
+            .get_row(Parameters(GetRowParams {
+                doc_id: "doc1".to_string(),
+                table_id: "tbl1".to_string(),
+                row_id: "r1".to_string(),
+            }))
+            .await
+            .unwrap();
+
+        let text = &result.content[0].raw.as_text().unwrap().text;
+        assert!(text.contains("Row: r1"));
+    }
+
+    #[tokio::test]
+    async fn test_add_row_success() {
+        let (server, mock_server) = setup().await;
+
+        Mock::given(method("POST"))
+            .and(path("/docs/doc1/tables/tbl1/rows"))
+            .respond_with(ResponseTemplate::new(202).set_body_json(serde_json::json!({
+                "requestId": "req-abc",
+                "addedRowIds": ["new-row-1"]
+            })))
+            .mount(&mock_server)
+            .await;
+
+        let mut cells = std::collections::HashMap::new();
+        cells.insert(
+            "Name".to_string(),
+            serde_json::Value::String("Charlie".to_string()),
+        );
+        cells.insert(
+            "Score".to_string(),
+            serde_json::Value::Number(serde_json::Number::from(100)),
+        );
+
+        let result = server
+            .add_row(Parameters(AddRowParams {
+                doc_id: "doc1".to_string(),
+                table_id: "tbl1".to_string(),
+                cells,
+            }))
+            .await
+            .unwrap();
+
+        let text = &result.content[0].raw.as_text().unwrap().text;
+        assert!(text.contains("Row added successfully"));
+        assert!(text.contains("req-abc"));
+        assert!(text.contains("new-row-1"));
+    }
+
+    #[tokio::test]
+    async fn test_update_row_success() {
+        let (server, mock_server) = setup().await;
+
+        Mock::given(method("PUT"))
+            .and(path("/docs/doc1/tables/tbl1/rows/r1"))
+            .respond_with(ResponseTemplate::new(202).set_body_json(serde_json::json!({
+                "requestId": "req-xyz"
+            })))
+            .mount(&mock_server)
+            .await;
+
+        let mut cells = std::collections::HashMap::new();
+        cells.insert(
+            "Status".to_string(),
+            serde_json::Value::String("Done".to_string()),
+        );
+
+        let result = server
+            .update_row(Parameters(UpdateRowParams {
+                doc_id: "doc1".to_string(),
+                table_id: "tbl1".to_string(),
+                row_id: "r1".to_string(),
+                cells,
+            }))
+            .await
+            .unwrap();
+
+        let text = &result.content[0].raw.as_text().unwrap().text;
+        assert!(text.contains("Row updated successfully"));
+        assert!(text.contains("req-xyz"));
+    }
+
+    #[tokio::test]
+    async fn test_delete_row_success() {
+        let (server, mock_server) = setup().await;
+
+        Mock::given(method("DELETE"))
+            .and(path("/docs/doc1/tables/tbl1/rows/r1"))
+            .respond_with(ResponseTemplate::new(202))
+            .mount(&mock_server)
+            .await;
+
+        let result = server
+            .delete_row(Parameters(DeleteRowParams {
+                doc_id: "doc1".to_string(),
+                table_id: "tbl1".to_string(),
+                row_id: "r1".to_string(),
+            }))
+            .await
+            .unwrap();
+
+        let text = &result.content[0].raw.as_text().unwrap().text;
+        assert!(text.contains("Row deleted successfully"));
+    }
+
+    #[tokio::test]
+    async fn test_delete_row_error() {
+        let (server, mock_server) = setup().await;
+
+        Mock::given(method("DELETE"))
+            .and(path("/docs/doc1/tables/tbl1/rows/r1"))
+            .respond_with(ResponseTemplate::new(404))
+            .mount(&mock_server)
+            .await;
+
+        let result = server
+            .delete_row(Parameters(DeleteRowParams {
+                doc_id: "doc1".to_string(),
+                table_id: "tbl1".to_string(),
+                row_id: "r1".to_string(),
+            }))
+            .await;
+
+        assert!(result.is_err());
+    }
+
+    // === Formula Tools ===
+
+    #[tokio::test]
+    async fn test_list_formulas_success() {
+        let (server, mock_server) = setup().await;
+
+        Mock::given(method("GET"))
+            .and(path("/docs/doc1/formulas"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                "items": [
+                    {"id": "f1", "name": "Total", "value": 42}
+                ]
+            })))
+            .mount(&mock_server)
+            .await;
+
+        let result = server
+            .list_formulas(Parameters(ListFormulasParams {
+                doc_id: "doc1".to_string(),
+            }))
+            .await
+            .unwrap();
+
+        let text = &result.content[0].raw.as_text().unwrap().text;
+        assert!(text.contains("Found 1 formulas"));
+    }
+
+    #[tokio::test]
+    async fn test_get_formula_success() {
+        let (server, mock_server) = setup().await;
+
+        Mock::given(method("GET"))
+            .and(path("/docs/doc1/formulas/f1"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                "id": "f1",
+                "name": "Total",
+                "value": 42
+            })))
+            .mount(&mock_server)
+            .await;
+
+        let result = server
+            .get_formula(Parameters(GetFormulaParams {
+                doc_id: "doc1".to_string(),
+                formula_id: "f1".to_string(),
+            }))
+            .await
+            .unwrap();
+
+        let text = &result.content[0].raw.as_text().unwrap().text;
+        assert!(text.contains("Formula: Total"));
+    }
+
+    // === Control Tools ===
+
+    #[tokio::test]
+    async fn test_list_controls_success() {
+        let (server, mock_server) = setup().await;
+
+        Mock::given(method("GET"))
+            .and(path("/docs/doc1/controls"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                "items": [
+                    {"id": "c1", "name": "Submit", "controlType": "button"},
+                    {"id": "c2", "name": "Progress", "controlType": "slider", "value": 75}
+                ]
+            })))
+            .mount(&mock_server)
+            .await;
+
+        let result = server
+            .list_controls(Parameters(ListControlsParams {
+                doc_id: "doc1".to_string(),
+            }))
+            .await
+            .unwrap();
+
+        let text = &result.content[0].raw.as_text().unwrap().text;
+        assert!(text.contains("Found 2 controls"));
+    }
+
+    // === get_page full success workflow ===
+
+    #[tokio::test]
+    async fn test_get_page_success() {
+        let (server, mock_server) = setup().await;
+
+        // Step 1: Initiate export
+        Mock::given(method("POST"))
+            .and(path("/docs/doc1/pages/p1/export"))
+            .respond_with(ResponseTemplate::new(202).set_body_json(serde_json::json!({
+                "id": "exp1",
+                "status": "inProgress"
+            })))
+            .mount(&mock_server)
+            .await;
+
+        // Step 2: Poll returns complete with downloadLink pointing at mock server
+        let download_url = format!("{}/export/content.html", mock_server.uri());
+        Mock::given(method("GET"))
+            .and(path("/docs/doc1/pages/p1/export/exp1"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                "id": "exp1",
+                "status": "complete",
+                "downloadLink": download_url
+            })))
+            .mount(&mock_server)
+            .await;
+
+        // Step 3: Download content from the link
+        Mock::given(method("GET"))
+            .and(path("/export/content.html"))
+            .respond_with(
+                ResponseTemplate::new(200)
+                    .set_body_string("<html><body>Page content here</body></html>"),
+            )
+            .mount(&mock_server)
+            .await;
+
+        // Step 4: Get page metadata
+        Mock::given(method("GET"))
+            .and(path("/docs/doc1/pages/p1"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                "id": "p1",
+                "name": "Welcome Page"
+            })))
+            .mount(&mock_server)
+            .await;
+
+        let result = server
+            .get_page(Parameters(GetPageParams {
+                doc_id: "doc1".to_string(),
+                page_id: "p1".to_string(),
+            }))
+            .await
+            .unwrap();
+
+        let text = &result.content[0].raw.as_text().unwrap().text;
+        assert!(text.contains("Page: Welcome Page"));
+        assert!(text.contains("Page content here"));
+    }
+
+    #[tokio::test]
+    async fn test_get_page_export_initiation_error() {
+        let (server, mock_server) = setup().await;
+
+        // Export POST fails
+        Mock::given(method("POST"))
+            .and(path("/docs/doc1/pages/p1/export"))
+            .respond_with(ResponseTemplate::new(500))
+            .mount(&mock_server)
+            .await;
+
+        let result = server
+            .get_page(Parameters(GetPageParams {
+                doc_id: "doc1".to_string(),
+                page_id: "p1".to_string(),
+            }))
+            .await;
+
+        assert!(result.is_err());
+    }
+
+    #[tokio::test]
+    async fn test_get_page_poll_error() {
+        let (server, mock_server) = setup().await;
+
+        // Export succeeds
+        Mock::given(method("POST"))
+            .and(path("/docs/doc1/pages/p1/export"))
+            .respond_with(ResponseTemplate::new(202).set_body_json(serde_json::json!({
+                "id": "exp1",
+                "status": "inProgress"
+            })))
+            .mount(&mock_server)
+            .await;
+
+        // Poll returns error
+        Mock::given(method("GET"))
+            .and(path("/docs/doc1/pages/p1/export/exp1"))
+            .respond_with(ResponseTemplate::new(500))
+            .mount(&mock_server)
+            .await;
+
+        let result = server
+            .get_page(Parameters(GetPageParams {
+                doc_id: "doc1".to_string(),
+                page_id: "p1".to_string(),
+            }))
+            .await;
+
+        assert!(result.is_err());
+    }
+
+    #[tokio::test]
+    async fn test_get_page_export_timeout() {
+        let (server, mock_server) = setup().await;
+
+        // Export succeeds
+        Mock::given(method("POST"))
+            .and(path("/docs/doc1/pages/p1/export"))
+            .respond_with(ResponseTemplate::new(202).set_body_json(serde_json::json!({
+                "id": "exp1",
+                "status": "inProgress"
+            })))
+            .mount(&mock_server)
+            .await;
+
+        // Poll always returns inProgress — never completes
+        Mock::given(method("GET"))
+            .and(path("/docs/doc1/pages/p1/export/exp1"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                "id": "exp1",
+                "status": "inProgress"
+            })))
+            .mount(&mock_server)
+            .await;
+
+        let result = server
+            .get_page(Parameters(GetPageParams {
+                doc_id: "doc1".to_string(),
+                page_id: "p1".to_string(),
+            }))
+            .await;
+
+        assert!(result.is_err());
+        let err = result.unwrap_err();
+        assert!(
+            err.message.contains("timed out"),
+            "Expected timeout error, got: {}",
+            err.message
+        );
+    }
+
+    #[tokio::test]
+    async fn test_get_page_download_error() {
+        let (server, mock_server) = setup().await;
+
+        Mock::given(method("POST"))
+            .and(path("/docs/doc1/pages/p1/export"))
+            .respond_with(ResponseTemplate::new(202).set_body_json(serde_json::json!({
+                "id": "exp1",
+                "status": "inProgress"
+            })))
+            .mount(&mock_server)
+            .await;
+
+        let download_url = format!("{}/export/content.html", mock_server.uri());
+        Mock::given(method("GET"))
+            .and(path("/docs/doc1/pages/p1/export/exp1"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                "id": "exp1",
+                "status": "complete",
+                "downloadLink": download_url
+            })))
+            .mount(&mock_server)
+            .await;
+
+        // Download fails
+        Mock::given(method("GET"))
+            .and(path("/export/content.html"))
+            .respond_with(ResponseTemplate::new(500).set_body_string("Server Error"))
+            .mount(&mock_server)
+            .await;
+
+        let result = server
+            .get_page(Parameters(GetPageParams {
+                doc_id: "doc1".to_string(),
+                page_id: "p1".to_string(),
+            }))
+            .await;
+
+        assert!(result.is_err());
     }
 }
 

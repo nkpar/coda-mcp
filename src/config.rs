@@ -78,4 +78,86 @@ mod tests {
         // Ensure the actual token is NOT in the debug output
         assert!(!debug_str.contains("super_secret_token_12345"));
     }
+
+    /// Helper to save, run test, and restore env vars.
+    /// Always sets a sentinel value before the test so restore branches are exercised.
+    fn with_env_vars<F: FnOnce()>(f: F) {
+        let saved_token = env::var("CODA_API_TOKEN").ok();
+        let saved_url = env::var("CODA_BASE_URL").ok();
+
+        // Pre-set sentinel values so restore branches always execute
+        env::set_var("CODA_API_TOKEN", "__sentinel__");
+        env::set_var("CODA_BASE_URL", "__sentinel__");
+
+        f();
+
+        // Restore original values
+        match saved_token {
+            Some(val) => env::set_var("CODA_API_TOKEN", val),
+            None => env::remove_var("CODA_API_TOKEN"),
+        }
+        match saved_url {
+            Some(val) => env::set_var("CODA_BASE_URL", val),
+            None => env::remove_var("CODA_BASE_URL"),
+        }
+    }
+
+    #[test]
+    fn test_from_env_missing_token() {
+        with_env_vars(|| {
+            env::remove_var("CODA_API_TOKEN");
+
+            let result = Config::from_env();
+            assert!(result.is_err());
+            assert!(matches!(result.unwrap_err(), ConfigError::MissingToken));
+        });
+    }
+
+    #[test]
+    fn test_from_env_with_token_default_url() {
+        with_env_vars(|| {
+            env::set_var("CODA_API_TOKEN", "test_token_123");
+            env::remove_var("CODA_BASE_URL");
+
+            let config = Config::from_env().unwrap();
+            assert_eq!(config.api_token, "test_token_123");
+            assert_eq!(config.base_url, "https://coda.io/apis/v1");
+        });
+    }
+
+    #[test]
+    fn test_from_env_with_custom_base_url() {
+        with_env_vars(|| {
+            env::set_var("CODA_API_TOKEN", "test_token_456");
+            env::set_var("CODA_BASE_URL", "https://custom.api.example.com/v2");
+
+            let config = Config::from_env().unwrap();
+            assert_eq!(config.api_token, "test_token_456");
+            assert_eq!(config.base_url, "https://custom.api.example.com/v2");
+        });
+    }
+
+    #[test]
+    fn test_with_env_vars_restores_existing_values() {
+        // Pre-set env vars so that saved_token/saved_url are Some(_)
+        // This ensures the Some(val) => env::set_var restore branch is covered
+        env::set_var("CODA_API_TOKEN", "pre_existing_token");
+        env::set_var("CODA_BASE_URL", "https://pre-existing.example.com");
+
+        with_env_vars(|| {
+            // Inside the closure, the sentinel values are set
+            // The test just needs to run; restore happens on exit
+        });
+
+        // Verify the original values were restored
+        assert_eq!(env::var("CODA_API_TOKEN").unwrap(), "pre_existing_token");
+        assert_eq!(
+            env::var("CODA_BASE_URL").unwrap(),
+            "https://pre-existing.example.com"
+        );
+
+        // Clean up
+        env::remove_var("CODA_API_TOKEN");
+        env::remove_var("CODA_BASE_URL");
+    }
 }

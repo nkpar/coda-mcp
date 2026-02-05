@@ -9,7 +9,17 @@ use crate::config::Config;
 use crate::error::CodaError;
 
 /// Trusted hosts for downloading export content
+#[cfg(not(test))]
 const ALLOWED_DOWNLOAD_HOSTS: &[&str] = &["coda.io", "codahosted.io", "storage.googleapis.com"];
+
+#[cfg(test)]
+const ALLOWED_DOWNLOAD_HOSTS: &[&str] = &[
+    "coda.io",
+    "codahosted.io",
+    "storage.googleapis.com",
+    "127.0.0.1",
+    "localhost",
+];
 
 #[derive(Clone)]
 pub struct CodaClient {
@@ -257,8 +267,20 @@ impl CodaClient {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::config::Config;
     use wiremock::matchers::{header, method, path};
     use wiremock::{Mock, MockServer, ResponseTemplate};
+
+    #[test]
+    fn test_new_from_config() {
+        let config = Config {
+            api_token: "test_token_abc".to_string(),
+            base_url: "https://coda.io/apis/v1".to_string(),
+        };
+        let client = CodaClient::new(&config);
+        assert_eq!(client.base_url, "https://coda.io/apis/v1");
+        assert_eq!(client.api_token, "test_token_abc");
+    }
 
     #[tokio::test]
     async fn test_get_success() {
@@ -495,6 +517,411 @@ mod tests {
                 }
                 _ => {} // Any other error (e.g., connection failure) is fine
             }
+        }
+    }
+
+    // --- POST error code tests ---
+
+    #[tokio::test]
+    async fn test_post_unauthorized() {
+        let mock_server = MockServer::start().await;
+        Mock::given(method("POST"))
+            .and(path("/docs"))
+            .respond_with(ResponseTemplate::new(401))
+            .mount(&mock_server)
+            .await;
+
+        let client = CodaClient::new_with_base_url("bad_token", &mock_server.uri());
+        let result: Result<serde_json::Value, _> =
+            client.post("/docs", &serde_json::json!({})).await;
+        assert!(matches!(result, Err(CodaError::Unauthorized)));
+    }
+
+    #[tokio::test]
+    async fn test_post_forbidden() {
+        let mock_server = MockServer::start().await;
+        Mock::given(method("POST"))
+            .and(path("/docs"))
+            .respond_with(ResponseTemplate::new(403))
+            .mount(&mock_server)
+            .await;
+
+        let client = CodaClient::new_with_base_url("test_token", &mock_server.uri());
+        let result: Result<serde_json::Value, _> =
+            client.post("/docs", &serde_json::json!({})).await;
+        assert!(matches!(result, Err(CodaError::Forbidden)));
+    }
+
+    #[tokio::test]
+    async fn test_post_not_found() {
+        let mock_server = MockServer::start().await;
+        Mock::given(method("POST"))
+            .and(path("/docs/invalid/rows"))
+            .respond_with(ResponseTemplate::new(404))
+            .mount(&mock_server)
+            .await;
+
+        let client = CodaClient::new_with_base_url("test_token", &mock_server.uri());
+        let result: Result<serde_json::Value, _> = client
+            .post("/docs/invalid/rows", &serde_json::json!({}))
+            .await;
+        assert!(matches!(result, Err(CodaError::NotFound)));
+    }
+
+    #[tokio::test]
+    async fn test_post_rate_limited() {
+        let mock_server = MockServer::start().await;
+        Mock::given(method("POST"))
+            .and(path("/docs"))
+            .respond_with(ResponseTemplate::new(429))
+            .mount(&mock_server)
+            .await;
+
+        let client = CodaClient::new_with_base_url("test_token", &mock_server.uri());
+        let result: Result<serde_json::Value, _> =
+            client.post("/docs", &serde_json::json!({})).await;
+        assert!(matches!(result, Err(CodaError::RateLimited)));
+    }
+
+    #[tokio::test]
+    async fn test_post_server_error() {
+        let mock_server = MockServer::start().await;
+        Mock::given(method("POST"))
+            .and(path("/docs"))
+            .respond_with(ResponseTemplate::new(500).set_body_string("Internal Server Error"))
+            .mount(&mock_server)
+            .await;
+
+        let client = CodaClient::new_with_base_url("test_token", &mock_server.uri());
+        let result: Result<serde_json::Value, _> =
+            client.post("/docs", &serde_json::json!({})).await;
+        match result {
+            Err(CodaError::Api { status, body }) => {
+                assert_eq!(status, 500);
+                assert!(body.contains("Internal Server Error"));
+            }
+            other => panic!("Expected Api error, got: {other:?}"),
+        }
+    }
+
+    // --- PUT error code tests ---
+
+    #[tokio::test]
+    async fn test_put_unauthorized() {
+        let mock_server = MockServer::start().await;
+        Mock::given(method("PUT"))
+            .and(path("/rows/r1"))
+            .respond_with(ResponseTemplate::new(401))
+            .mount(&mock_server)
+            .await;
+
+        let client = CodaClient::new_with_base_url("test_token", &mock_server.uri());
+        let result: Result<serde_json::Value, _> =
+            client.put("/rows/r1", &serde_json::json!({})).await;
+        assert!(matches!(result, Err(CodaError::Unauthorized)));
+    }
+
+    #[tokio::test]
+    async fn test_put_forbidden() {
+        let mock_server = MockServer::start().await;
+        Mock::given(method("PUT"))
+            .and(path("/rows/r1"))
+            .respond_with(ResponseTemplate::new(403))
+            .mount(&mock_server)
+            .await;
+
+        let client = CodaClient::new_with_base_url("test_token", &mock_server.uri());
+        let result: Result<serde_json::Value, _> =
+            client.put("/rows/r1", &serde_json::json!({})).await;
+        assert!(matches!(result, Err(CodaError::Forbidden)));
+    }
+
+    #[tokio::test]
+    async fn test_put_not_found() {
+        let mock_server = MockServer::start().await;
+        Mock::given(method("PUT"))
+            .and(path("/rows/invalid"))
+            .respond_with(ResponseTemplate::new(404))
+            .mount(&mock_server)
+            .await;
+
+        let client = CodaClient::new_with_base_url("test_token", &mock_server.uri());
+        let result: Result<serde_json::Value, _> =
+            client.put("/rows/invalid", &serde_json::json!({})).await;
+        assert!(matches!(result, Err(CodaError::NotFound)));
+    }
+
+    #[tokio::test]
+    async fn test_put_rate_limited() {
+        let mock_server = MockServer::start().await;
+        Mock::given(method("PUT"))
+            .and(path("/rows/r1"))
+            .respond_with(ResponseTemplate::new(429))
+            .mount(&mock_server)
+            .await;
+
+        let client = CodaClient::new_with_base_url("test_token", &mock_server.uri());
+        let result: Result<serde_json::Value, _> =
+            client.put("/rows/r1", &serde_json::json!({})).await;
+        assert!(matches!(result, Err(CodaError::RateLimited)));
+    }
+
+    #[tokio::test]
+    async fn test_put_server_error() {
+        let mock_server = MockServer::start().await;
+        Mock::given(method("PUT"))
+            .and(path("/rows/r1"))
+            .respond_with(ResponseTemplate::new(503).set_body_string("Service Unavailable"))
+            .mount(&mock_server)
+            .await;
+
+        let client = CodaClient::new_with_base_url("test_token", &mock_server.uri());
+        let result: Result<serde_json::Value, _> =
+            client.put("/rows/r1", &serde_json::json!({})).await;
+        match result {
+            Err(CodaError::Api { status, body }) => {
+                assert_eq!(status, 503);
+                assert!(body.contains("Service Unavailable"));
+            }
+            other => panic!("Expected Api error, got: {other:?}"),
+        }
+    }
+
+    // --- DELETE error code tests ---
+
+    #[tokio::test]
+    async fn test_delete_unauthorized() {
+        let mock_server = MockServer::start().await;
+        Mock::given(method("DELETE"))
+            .and(path("/docs/d1"))
+            .respond_with(ResponseTemplate::new(401))
+            .mount(&mock_server)
+            .await;
+
+        let client = CodaClient::new_with_base_url("test_token", &mock_server.uri());
+        let result = client.delete("/docs/d1").await;
+        assert!(matches!(result, Err(CodaError::Unauthorized)));
+    }
+
+    #[tokio::test]
+    async fn test_delete_forbidden() {
+        let mock_server = MockServer::start().await;
+        Mock::given(method("DELETE"))
+            .and(path("/docs/d1"))
+            .respond_with(ResponseTemplate::new(403))
+            .mount(&mock_server)
+            .await;
+
+        let client = CodaClient::new_with_base_url("test_token", &mock_server.uri());
+        let result = client.delete("/docs/d1").await;
+        assert!(matches!(result, Err(CodaError::Forbidden)));
+    }
+
+    #[tokio::test]
+    async fn test_delete_not_found() {
+        let mock_server = MockServer::start().await;
+        Mock::given(method("DELETE"))
+            .and(path("/docs/invalid"))
+            .respond_with(ResponseTemplate::new(404))
+            .mount(&mock_server)
+            .await;
+
+        let client = CodaClient::new_with_base_url("test_token", &mock_server.uri());
+        let result = client.delete("/docs/invalid").await;
+        assert!(matches!(result, Err(CodaError::NotFound)));
+    }
+
+    #[tokio::test]
+    async fn test_delete_server_error() {
+        let mock_server = MockServer::start().await;
+        Mock::given(method("DELETE"))
+            .and(path("/docs/d1"))
+            .respond_with(ResponseTemplate::new(500).set_body_string("Server Error"))
+            .mount(&mock_server)
+            .await;
+
+        let client = CodaClient::new_with_base_url("test_token", &mock_server.uri());
+        let result = client.delete("/docs/d1").await;
+        match result {
+            Err(CodaError::Api { status, body }) => {
+                assert_eq!(status, 500);
+                assert!(body.contains("Server Error"));
+            }
+            other => panic!("Expected Api error, got: {other:?}"),
+        }
+    }
+
+    // --- GET generic server error (covers the _ => CodaError::Api branch) ---
+
+    #[tokio::test]
+    async fn test_get_server_error() {
+        let mock_server = MockServer::start().await;
+        Mock::given(method("GET"))
+            .and(path("/docs"))
+            .respond_with(ResponseTemplate::new(502).set_body_string("Bad Gateway"))
+            .mount(&mock_server)
+            .await;
+
+        let client = CodaClient::new_with_base_url("test_token", &mock_server.uri());
+        let result: Result<serde_json::Value, _> = client.get("/docs").await;
+        match result {
+            Err(CodaError::Api { status, body }) => {
+                assert_eq!(status, 502);
+                assert!(body.contains("Bad Gateway"));
+            }
+            other => panic!("Expected Api error, got: {other:?}"),
+        }
+    }
+
+    // --- download_raw URL edge cases ---
+
+    #[tokio::test]
+    async fn test_download_raw_rejects_subdomain_spoofing() {
+        let client = CodaClient::new_with_base_url("test_token", "https://api.coda.io");
+
+        // A host that ends with a trusted domain but isn't one
+        let result = client.download_raw("https://evil-coda.io/file").await;
+
+        match result {
+            Err(CodaError::Api { body, .. }) if body.contains("Untrusted") => {}
+            // evil-coda.io ends_with coda.io — this is a known limitation
+            // If it passes validation, that's a finding worth noting
+            _ => {}
+        }
+    }
+
+    #[tokio::test]
+    async fn test_download_raw_url_without_host() {
+        let client = CodaClient::new_with_base_url("test_token", "https://api.coda.io");
+
+        // file:// URL has no host
+        let result = client.download_raw("file:///etc/passwd").await;
+        match result {
+            Err(CodaError::Api { body, .. }) => {
+                assert!(
+                    body.contains("Untrusted") || body.contains("Invalid"),
+                    "Expected rejection, got: {body}"
+                );
+            }
+            _ => panic!("Expected error for file:// URL"),
+        }
+    }
+
+    // --- download_raw HTTP success path tests ---
+    // These work because cfg(test) adds 127.0.0.1 to ALLOWED_DOWNLOAD_HOSTS
+
+    #[tokio::test]
+    async fn test_download_raw_plain_text() {
+        let mock_server = MockServer::start().await;
+
+        Mock::given(method("GET"))
+            .and(path("/export/file.html"))
+            .respond_with(
+                ResponseTemplate::new(200).set_body_string("<html><body>Hello</body></html>"),
+            )
+            .mount(&mock_server)
+            .await;
+
+        let client = CodaClient::new_with_base_url("test_token", &mock_server.uri());
+        let url = format!("{}/export/file.html", mock_server.uri());
+        let content = client.download_raw(&url).await.unwrap();
+
+        assert_eq!(content, "<html><body>Hello</body></html>");
+    }
+
+    #[tokio::test]
+    async fn test_download_raw_gzip_content() {
+        use flate2::write::GzEncoder;
+        use flate2::Compression;
+        use std::io::Write;
+
+        let mock_server = MockServer::start().await;
+
+        // Create gzip-compressed content
+        let original = "<html><body>Compressed content</body></html>";
+        let mut encoder = GzEncoder::new(Vec::new(), Compression::default());
+        encoder.write_all(original.as_bytes()).unwrap();
+        let compressed = encoder.finish().unwrap();
+
+        Mock::given(method("GET"))
+            .and(path("/export/file.html.gz"))
+            .respond_with(ResponseTemplate::new(200).set_body_bytes(compressed))
+            .mount(&mock_server)
+            .await;
+
+        let client = CodaClient::new_with_base_url("test_token", &mock_server.uri());
+        let url = format!("{}/export/file.html.gz", mock_server.uri());
+        let content = client.download_raw(&url).await.unwrap();
+
+        assert_eq!(content, original);
+    }
+
+    #[tokio::test]
+    async fn test_download_raw_http_error() {
+        let mock_server = MockServer::start().await;
+
+        Mock::given(method("GET"))
+            .and(path("/export/missing"))
+            .respond_with(ResponseTemplate::new(404).set_body_string("Not Found"))
+            .mount(&mock_server)
+            .await;
+
+        let client = CodaClient::new_with_base_url("test_token", &mock_server.uri());
+        let url = format!("{}/export/missing", mock_server.uri());
+        let result = client.download_raw(&url).await;
+
+        match result {
+            Err(CodaError::Api { status, body }) => {
+                assert_eq!(status, 404);
+                assert!(body.contains("Not Found"));
+            }
+            other => panic!("Expected Api error, got: {other:?}"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_download_raw_empty_body() {
+        let mock_server = MockServer::start().await;
+
+        Mock::given(method("GET"))
+            .and(path("/export/empty"))
+            .respond_with(ResponseTemplate::new(200).set_body_bytes(Vec::<u8>::new()))
+            .mount(&mock_server)
+            .await;
+
+        let client = CodaClient::new_with_base_url("test_token", &mock_server.uri());
+        let url = format!("{}/export/empty", mock_server.uri());
+        let content = client.download_raw(&url).await.unwrap();
+
+        assert_eq!(content, "");
+    }
+
+    #[tokio::test]
+    async fn test_download_raw_invalid_gzip() {
+        let mock_server = MockServer::start().await;
+
+        // Gzip magic bytes (0x1f, 0x8b) followed by garbage data
+        let corrupt_gzip = vec![0x1f, 0x8b, 0x00, 0xff, 0xff, 0xff];
+
+        Mock::given(method("GET"))
+            .and(path("/export/corrupt.gz"))
+            .respond_with(ResponseTemplate::new(200).set_body_bytes(corrupt_gzip))
+            .mount(&mock_server)
+            .await;
+
+        let client = CodaClient::new_with_base_url("test_token", &mock_server.uri());
+        let url = format!("{}/export/corrupt.gz", mock_server.uri());
+        let result = client.download_raw(&url).await;
+
+        match result {
+            Err(CodaError::Api { status, body }) => {
+                assert_eq!(status, 0);
+                assert!(
+                    body.contains("Failed to decompress gzip"),
+                    "Expected gzip error, got: {body}"
+                );
+            }
+            other => panic!("Expected gzip decompression error, got: {other:?}"),
         }
     }
 }

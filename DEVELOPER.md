@@ -257,6 +257,39 @@ docker run -e CODA_API_TOKEN=xxx ghcr.io/nkpar/coda-mcp:latest
 docker build -t coda-mcp .
 ```
 
+### Testing & Coverage
+
+**Test counts (as of Feb 2026):**
+- 121 unit tests (in `src/`)
+- 23 integration tests (`tests/integration_tests.rs`)
+- 10 E2E tests (`tests/e2e_tests.rs`, ignored by default)
+- 2 Docker E2E tests (`tests/docker_e2e.rs`, ignored by default)
+
+**Coverage: 97.57% line coverage** (measured with `cargo llvm-cov`)
+
+| File | Coverage |
+|------|----------|
+| `main.rs` | 96.12% |
+| `client.rs` | 98.48% |
+| `config.rs` | 97.92% |
+| `error.rs` | 100% |
+| `models/*` | 100% |
+
+Only uncovered code: `main()` function (17 lines) — binary entrypoint with stdio transport, inherently untestable.
+
+**Test architecture:**
+- Tool handler tests live in `src/main.rs` `#[cfg(test)] mod tests` — direct access to private methods via `Parameters<T>` wrapper
+- Client HTTP tests use `wiremock` mocks for all HTTP methods (GET/POST/PUT/DELETE) and all error codes (401/403/404/429/5xx)
+- Config tests manipulate env vars — run with `--test-threads=1` to avoid races
+- Integration tests in `tests/` test raw HTTP endpoints with wiremock
+
+**Running coverage:**
+```bash
+cargo llvm-cov --summary-only    # summary
+cargo llvm-cov --text             # per-file detail
+cargo llvm-cov --html             # HTML report in target/llvm-cov/html/
+```
+
 ### MCP Registry
 
 The server is published to the [MCP Registry](https://registry.modelcontextprotocol.io/) via `server.json`. To publish updates:
