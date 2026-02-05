@@ -1,12 +1,9 @@
 # Build stage
-FROM rust:1.93-slim-bookworm AS builder
+FROM rust:1.93-alpine AS builder
 
 WORKDIR /app
 
-# Install build dependencies
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    pkg-config \
-    && rm -rf /var/lib/apt/lists/*
+RUN apk add --no-cache musl-dev
 
 # Copy manifests first for layer caching
 COPY Cargo.toml Cargo.lock ./
@@ -24,12 +21,9 @@ COPY src ./src
 RUN cargo build --release
 
 # Runtime stage
-FROM debian:bookworm-slim
+FROM scratch
 
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    ca-certificates \
-    && rm -rf /var/lib/apt/lists/*
-
+COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
 COPY --from=builder /app/target/release/coda-mcp /usr/local/bin/
 
 LABEL io.modelcontextprotocol.server.name="io.github.nkpar/coda"

@@ -1,8 +1,9 @@
-FROM debian:bookworm-slim
+FROM alpine:3 AS certs
+RUN apk add --no-cache ca-certificates
 
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    ca-certificates \
-    && rm -rf /var/lib/apt/lists/*
+FROM scratch
+
+COPY --from=certs /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
 
 ARG TARGETPLATFORM
 COPY docker-build/${TARGETPLATFORM}/coda-mcp /usr/local/bin/
