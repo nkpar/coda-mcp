@@ -38,7 +38,10 @@ fn test_docker_mcp_initialize() {
         return;
     }
     if !image_exists() {
-        eprintln!("Skipping: Image {} not found. Run: docker build -t {} .", IMAGE, IMAGE);
+        eprintln!(
+            "Skipping: Image {} not found. Run: docker build -t {} .",
+            IMAGE, IMAGE
+        );
         return;
     }
     let token = match get_token() {
@@ -51,8 +54,11 @@ fn test_docker_mcp_initialize() {
 
     let mut child = Command::new("docker")
         .args([
-            "run", "--rm", "-i",
-            "-e", &format!("CODA_API_TOKEN={}", token),
+            "run",
+            "--rm",
+            "-i",
+            "-e",
+            &format!("CODA_API_TOKEN={}", token),
             IMAGE,
         ])
         .stdin(Stdio::piped())
@@ -91,9 +97,21 @@ fn test_docker_mcp_initialize() {
     let _ = child.kill();
 
     // Verify response
-    assert!(response.contains("\"result\""), "Expected result in response: {}", response);
-    assert!(response.contains("\"protocolVersion\""), "Expected protocolVersion: {}", response);
-    assert!(response.contains("\"capabilities\""), "Expected capabilities: {}", response);
+    assert!(
+        response.contains("\"result\""),
+        "Expected result in response: {}",
+        response
+    );
+    assert!(
+        response.contains("\"protocolVersion\""),
+        "Expected protocolVersion: {}",
+        response
+    );
+    assert!(
+        response.contains("\"capabilities\""),
+        "Expected capabilities: {}",
+        response
+    );
 
     println!("Response: {}", response);
 }
@@ -109,8 +127,11 @@ fn test_docker_mcp_list_tools() {
 
     let mut child = Command::new("docker")
         .args([
-            "run", "--rm", "-i",
-            "-e", &format!("CODA_API_TOKEN={}", token),
+            "run",
+            "--rm",
+            "-i",
+            "-e",
+            &format!("CODA_API_TOKEN={}", token),
             IMAGE,
         ])
         .stdin(Stdio::piped())
@@ -127,11 +148,19 @@ fn test_docker_mcp_list_tools() {
     stdin.flush().unwrap();
 
     // Send initialized notification (required by MCP protocol)
-    writeln!(stdin, r#"{{"jsonrpc":"2.0","method":"notifications/initialized","params":{{}}}}"#).unwrap();
+    writeln!(
+        stdin,
+        r#"{{"jsonrpc":"2.0","method":"notifications/initialized","params":{{}}}}"#
+    )
+    .unwrap();
     stdin.flush().unwrap();
 
     // Then list tools
-    writeln!(stdin, r#"{{"jsonrpc":"2.0","id":2,"method":"tools/list","params":{{}}}}"#).unwrap();
+    writeln!(
+        stdin,
+        r#"{{"jsonrpc":"2.0","id":2,"method":"tools/list","params":{{}}}}"#
+    )
+    .unwrap();
     stdin.flush().unwrap();
 
     let reader = BufReader::new(stdout);
@@ -154,8 +183,16 @@ fn test_docker_mcp_list_tools() {
     drop(stdin);
     let _ = child.kill();
 
-    assert!(response.contains("list_docs"), "Expected list_docs tool: {}", response);
-    assert!(response.contains("get_rows"), "Expected get_rows tool: {}", response);
+    assert!(
+        response.contains("list_docs"),
+        "Expected list_docs tool: {}",
+        response
+    );
+    assert!(
+        response.contains("get_rows"),
+        "Expected get_rows tool: {}",
+        response
+    );
 
     println!("Tools response: {}", response);
 }
