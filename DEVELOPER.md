@@ -202,3 +202,43 @@ The following security measures are implemented:
 5. **Install script security**:
    - Token input is silent (`read -sp`)
    - Config file permissions set to 600 (owner read/write only)
+
+### CI/CD Workflows
+
+Two GitHub Actions workflows in `.github/workflows/`:
+
+**CI (`ci.yml`)** - runs on push/PR to main:
+```
+lint → test ──┐
+      security ┴→ build
+```
+
+**Release (`release.yml`)** - runs on version tags (`v*`):
+```
+lint → test ──┐
+      security ┴→ build (3 targets) → publish → release
+```
+
+**Job hierarchy:**
+1. **Lint** - format check + clippy
+2. **Test** - cargo test (needs lint)
+3. **Security** - rustsec audit (needs lint, parallel with test)
+4. **Build** - release builds (needs test + security)
+5. **Publish** - crates.io via trusted publishing (needs build)
+6. **Release** - GitHub release with binaries (needs publish)
+
+**Features:**
+- **Trusted publishing**: Uses OIDC via `rust-lang/crates-io-auth-action` - no API token secrets needed
+- **Build attestation**: SLSA provenance via `actions/attest-build-provenance`
+- **Shared caches**: `Swatinem/rust-cache` with `shared-key` for cache reuse across jobs
+- **Multi-platform builds**: linux-x86_64, macos-x86_64, macos-aarch64
+
+**Creating a release:**
+```bash
+# Bump version in Cargo.toml
+cargo check  # updates Cargo.lock
+git add Cargo.toml Cargo.lock
+git commit -m "chore: bump version to X.Y.Z"
+git tag vX.Y.Z
+git push origin main --tags
+```
