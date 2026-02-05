@@ -1,6 +1,6 @@
 [package]
 name = "coda-mcp"
-version = "0.1.7"
+version = "0.1.8"
 edition = "2021"
 rust-version = "1.93"
 description = "MCP server for Coda.io API - enables AI assistants to read and write Coda documents, tables, and rows"
