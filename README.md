@@ -105,7 +105,13 @@ Get your Coda API token from [coda.io/account](https://coda.io/account) → API 
 }
 ```
 
-**Claude Code** (`.mcp.json` in project root):
+**Claude Code** (CLI):
+
+```bash
+claude mcp add coda -e CODA_API_TOKEN=your_token_here -- $HOME/.cargo/bin/coda-mcp
+```
+
+Or via `.mcp.json` in project root:
 
 ```json
 {
