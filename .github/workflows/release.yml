@@ -96,11 +96,11 @@ jobs:
 
       - uses: Swatinem/rust-cache@v2
         with:
-          shared-key: ${{ matrix.target == 'x86_64-unknown-linux-gnu' && 'ubuntu' || format('macos-{0}', matrix.target) }}
+          shared-key: ${{ matrix.os == 'ubuntu-latest' && 'ubuntu' || 'macos' }}
 
       - name: Install cross
         if: matrix.use_cross
-        run: cargo install cross --git https://github.com/cross-rs/cross
+        uses: taiki-e/install-action@cross
 
       - name: Build
         run: |
