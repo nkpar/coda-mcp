@@ -229,7 +229,7 @@ lint → test ──┐
 
 **Features:**
 - **Trusted publishing**: Uses OIDC via `rust-lang/crates-io-auth-action` - no API token secrets needed
-- **Build attestation**: SLSA provenance via `actions/attest-build-provenance`
+- **Build attestation**: SLSA provenance via `actions/attest-build-provenance@v3.2.0`
 - **Shared caches**: `Swatinem/rust-cache` with `shared-key` for cache reuse across jobs
 - **Multi-platform builds**: linux-x86_64, macos-x86_64, macos-aarch64
 
