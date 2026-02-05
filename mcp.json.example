@@ -1,0 +1,10 @@
+{
+  "mcpServers": {
+    "coda": {
+      "command": "/path/to/coda-mcp",
+      "env": {
+        "CODA_API_TOKEN": "your_api_token_here"
+      }
+    }
+  }
+}

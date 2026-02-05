@@ -1,0 +1,21 @@
+# Environment files
+.env
+.env.local
+.env.*.local
+.mcp.json
+
+# Build artifacts
+/target/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Claude Code local config
+.claude/
