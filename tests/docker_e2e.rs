@@ -1,7 +1,7 @@
 //! Docker E2E tests for coda-mcp
 //!
-//! Run with: cargo test --test docker_e2e -- --ignored
-//! Requires: Docker, CODA_API_TOKEN env var
+//! Run with: cargo test --test `docker_e2e` -- --ignored
+//! Requires: Docker, `CODA_API_TOKEN` env var
 
 use std::io::{BufRead, BufReader, Write};
 use std::process::{Command, Stdio};
@@ -31,25 +31,19 @@ fn get_token() -> Option<String> {
 }
 
 #[test]
-#[ignore]
+#[ignore = "requires Docker and CODA_API_TOKEN"]
 fn test_docker_mcp_initialize() {
     if !docker_available() {
         eprintln!("Skipping: Docker not available");
         return;
     }
     if !image_exists() {
-        eprintln!(
-            "Skipping: Image {} not found. Run: docker build -t {} .",
-            IMAGE, IMAGE
-        );
+        eprintln!("Skipping: Image {IMAGE} not found. Run: docker build -t {IMAGE} .");
         return;
     }
-    let token = match get_token() {
-        Some(t) => t,
-        None => {
-            eprintln!("Skipping: CODA_API_TOKEN not set");
-            return;
-        }
+    let Some(token) = get_token() else {
+        eprintln!("Skipping: CODA_API_TOKEN not set");
+        return;
     };
 
     let mut child = Command::new("docker")
@@ -58,7 +52,7 @@ fn test_docker_mcp_initialize() {
             "--rm",
             "-i",
             "-e",
-            &format!("CODA_API_TOKEN={}", token),
+            &format!("CODA_API_TOKEN={token}"),
             IMAGE,
         ])
         .stdin(Stdio::piped())
@@ -72,7 +66,7 @@ fn test_docker_mcp_initialize() {
 
     // Send initialize request
     let request = r#"{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"test","version":"1.0"}}}"#;
-    writeln!(stdin, "{}", request).expect("Failed to write request");
+    writeln!(stdin, "{request}").expect("Failed to write request");
     stdin.flush().expect("Failed to flush");
 
     // Read response with timeout
@@ -80,11 +74,8 @@ fn test_docker_mcp_initialize() {
     let (tx, rx) = std::sync::mpsc::channel();
 
     std::thread::spawn(move || {
-        for line in reader.lines() {
-            if let Ok(line) = line {
-                let _ = tx.send(line);
-                break;
-            }
+        if let Some(line) = reader.lines().map_while(Result::ok).next() {
+            let _ = tx.send(line);
         }
     });
 
@@ -95,29 +86,27 @@ fn test_docker_mcp_initialize() {
     // Cleanup
     drop(stdin);
     let _ = child.kill();
+    let _ = child.wait();
 
     // Verify response
     assert!(
         response.contains("\"result\""),
-        "Expected result in response: {}",
-        response
+        "Expected result in response: {response}"
     );
     assert!(
         response.contains("\"protocolVersion\""),
-        "Expected protocolVersion: {}",
-        response
+        "Expected protocolVersion: {response}"
     );
     assert!(
         response.contains("\"capabilities\""),
-        "Expected capabilities: {}",
-        response
+        "Expected capabilities: {response}"
     );
 
-    println!("Response: {}", response);
+    println!("Response: {response}");
 }
 
 #[test]
-#[ignore]
+#[ignore = "requires Docker and CODA_API_TOKEN"]
 fn test_docker_mcp_list_tools() {
     if !docker_available() || !image_exists() || get_token().is_none() {
         eprintln!("Skipping: prerequisites not met");
@@ -131,7 +120,7 @@ fn test_docker_mcp_list_tools() {
             "--rm",
             "-i",
             "-e",
-            &format!("CODA_API_TOKEN={}", token),
+            &format!("CODA_API_TOKEN={token}"),
             IMAGE,
         ])
         .stdin(Stdio::piped())
@@ -167,10 +156,8 @@ fn test_docker_mcp_list_tools() {
     let (tx, rx) = std::sync::mpsc::channel();
 
     std::thread::spawn(move || {
-        for line in reader.lines() {
-            if let Ok(line) = line {
-                let _ = tx.send(line);
-            }
+        for line in reader.lines().map_while(Result::ok) {
+            let _ = tx.send(line);
         }
     });
 
@@ -182,17 +169,16 @@ fn test_docker_mcp_list_tools() {
 
     drop(stdin);
     let _ = child.kill();
+    let _ = child.wait();
 
     assert!(
         response.contains("list_docs"),
-        "Expected list_docs tool: {}",
-        response
+        "Expected list_docs tool: {response}"
     );
     assert!(
         response.contains("get_rows"),
-        "Expected get_rows tool: {}",
-        response
+        "Expected get_rows tool: {response}"
     );
 
-    println!("Tools response: {}", response);
+    println!("Tools response: {response}");
 }
