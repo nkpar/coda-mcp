@@ -2,7 +2,7 @@
 name = "coda-mcp"
 version = "0.1.0"
 edition = "2021"
-rust-version = "1.75"
+rust-version = "1.80"
 description = "MCP server for Coda.io API"
 license = "MIT"
 
