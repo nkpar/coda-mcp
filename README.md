@@ -1,8 +1,9 @@
 # coda-mcp
 
+[![Crates.io](https://img.shields.io/crates/v/coda-mcp.svg)](https://crates.io/crates/coda-mcp)
 [![CI](https://github.com/nkpar/coda-mcp/actions/workflows/ci.yml/badge.svg)](https://github.com/nkpar/coda-mcp/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![RUST](https://img.shields.io/badge/MSRV-1.93-orange.svg)](https://www.rust-lang.org)
+[![MSRV](https://img.shields.io/badge/MSRV-1.93-orange.svg)](https://www.rust-lang.org)
 
 MCP (Model Context Protocol) server for [Coda.io](https://coda.io) API. Enables AI assistants to read and write Coda documents, tables, and rows.
 
@@ -42,6 +43,12 @@ export $(cat .env | xargs) && ./target/release/coda-mcp
 ```
 
 ## Installation
+
+### From crates.io (Recommended)
+
+```bash
+cargo install coda-mcp
+```
 
 ### From Source
 
