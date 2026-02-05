@@ -27,7 +27,7 @@ jobs:
 
       - uses: Swatinem/rust-cache@v2
         with:
-          shared-key: lint
+          shared-key: ubuntu
 
       - name: Format check
         run: cargo fmt --all --check
@@ -46,7 +46,7 @@ jobs:
 
       - uses: Swatinem/rust-cache@v2
         with:
-          shared-key: test
+          shared-key: ubuntu
 
       - name: Run tests
         run: cargo test --all-features
@@ -88,7 +88,7 @@ jobs:
 
       - uses: Swatinem/rust-cache@v2
         with:
-          shared-key: build-${{ matrix.target }}
+          shared-key: ${{ matrix.target == 'x86_64-unknown-linux-gnu' && 'ubuntu' || format('macos-{0}', matrix.target) }}
 
       - name: Build
         run: cargo build --release --target ${{ matrix.target }}
@@ -120,7 +120,7 @@ jobs:
 
       - uses: Swatinem/rust-cache@v2
         with:
-          shared-key: test
+          shared-key: ubuntu
 
       - name: Authenticate with crates.io
         id: crates-io-auth
