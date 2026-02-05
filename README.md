@@ -3,6 +3,7 @@
 [![MCP Registry](https://img.shields.io/badge/MCP-Registry-blue)](https://registry.modelcontextprotocol.io/)
 [![Crates.io](https://img.shields.io/crates/v/coda-mcp.svg)](https://crates.io/crates/coda-mcp)
 [![CI](https://github.com/nkpar/coda-mcp/actions/workflows/ci.yml/badge.svg)](https://github.com/nkpar/coda-mcp/actions/workflows/ci.yml)
+[![codecov](https://codecov.io/gh/nkpar/coda-mcp/graph/badge.svg)](https://codecov.io/gh/nkpar/coda-mcp)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![MSRV](https://img.shields.io/badge/MSRV-1.93-orange.svg)](https://www.rust-lang.org)
 
