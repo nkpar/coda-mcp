@@ -1,8 +1,8 @@
 {
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
   "name": "io.github.nkpar/coda",
-  "version": "0.2.0",
-  "description": "MCP server for Coda.io API - enables AI assistants to read and write Coda documents, tables, and rows",
+  "version": "0.2.1",
+  "description": "Interact with Coda.io documents, tables, and rows via the Coda API",
   "repository": {
     "url": "https://github.com/nkpar/coda-mcp",
     "source": "github"
@@ -10,8 +10,7 @@
   "packages": [
     {
       "registryType": "oci",
-      "identifier": "ghcr.io/nkpar/coda-mcp",
-      "version": "0.2.0",
+      "identifier": "ghcr.io/nkpar/coda-mcp:0.2.1",
       "transport": {
         "type": "stdio"
       },

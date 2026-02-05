@@ -32,5 +32,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 COPY --from=builder /app/target/release/coda-mcp /usr/local/bin/
 
+LABEL io.modelcontextprotocol.server.name="io.github.nkpar/coda"
+
 # MCP servers communicate via stdio
 ENTRYPOINT ["coda-mcp"]
