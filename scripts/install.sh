@@ -4,13 +4,20 @@ set -e
 echo "=== Coda MCP Installer for Claude Desktop ==="
 echo ""
 
-# 1. Install via cargo
+# 1. Check for cargo
+if ! command -v cargo &> /dev/null; then
+    echo "Error: Rust/Cargo is required but not installed."
+    echo "Install from: https://rustup.rs"
+    exit 1
+fi
+
+# 2. Install via cargo
 echo "Installing coda-mcp from crates.io..."
 cargo install coda-mcp
 echo "Install complete."
 echo ""
 
-# 2. Find Claude Desktop config
+# 3. Find Claude Desktop config
 if [[ "$OSTYPE" == "darwin"* ]]; then
     CONFIG_DIR="$HOME/Library/Application Support/Claude"
 else
@@ -21,7 +28,7 @@ CONFIG_FILE="$CONFIG_DIR/claude_desktop_config.json"
 echo "Config location: $CONFIG_FILE"
 echo ""
 
-# 3. Prompt for token (silent input)
+# 4. Prompt for token (silent input)
 echo "To get your Coda API token:"
 echo "  1. Go to https://coda.io/account"
 echo "  2. Scroll to 'API settings'"
@@ -36,14 +43,14 @@ if [ -z "$CODA_TOKEN" ]; then
     exit 1
 fi
 
-# 4. Check for jq
+# 5. Check for jq
 if ! command -v jq &> /dev/null; then
     echo "Error: jq is required but not installed."
     echo "Install with: brew install jq (macOS) or apt install jq (Linux)"
     exit 1
 fi
 
-# 5. Create/update config
+# 6. Create/update config
 mkdir -p "$CONFIG_DIR"
 
 if [ -f "$CONFIG_FILE" ]; then
