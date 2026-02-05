@@ -100,7 +100,7 @@ jobs:
           chmod +x dist/${{ matrix.artifact }}
 
       - name: Attest Build Provenance
-        uses: actions/attest-build-provenance@v2
+        uses: actions/attest-build-provenance@v3.2.0
         with:
           subject-path: dist/${{ matrix.artifact }}
 
