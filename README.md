@@ -1,5 +1,6 @@
 # coda-mcp
 
+[![MCP Registry](https://img.shields.io/badge/MCP-Registry-blue)](https://registry.modelcontextprotocol.io/)
 [![Crates.io](https://img.shields.io/crates/v/coda-mcp.svg)](https://crates.io/crates/coda-mcp)
 [![CI](https://github.com/nkpar/coda-mcp/actions/workflows/ci.yml/badge.svg)](https://github.com/nkpar/coda-mcp/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
@@ -74,6 +75,22 @@ Check the [Releases](https://github.com/nkpar/coda-mcp/releases) page.
 
 ```bash
 docker pull ghcr.io/nkpar/coda-mcp:latest
+```
+
+Claude Desktop config for Docker:
+
+```json
+{
+  "mcpServers": {
+    "coda": {
+      "command": "docker",
+      "args": ["run", "--rm", "-i", "-e", "CODA_API_TOKEN", "ghcr.io/nkpar/coda-mcp:latest"],
+      "env": {
+        "CODA_API_TOKEN": "your_token_here"
+      }
+    }
+  }
+}
 ```
 
 ### One-Click Install Script
