@@ -17,30 +17,36 @@ MCP (Model Context Protocol) server for [Coda.io](https://coda.io) API. Enables 
 
 ## Quick Start
 
-### One-Click Install (Claude Desktop)
+### 1. Install
 
 ```bash
-git clone https://github.com/nkpar/coda-mcp.git
-cd coda-mcp
-./scripts/install.sh
+cargo install coda-mcp
 ```
 
-The script builds the binary, prompts for your Coda API token, and configures Claude Desktop automatically.
+### 2. Get API Token
 
-### Manual Setup
+Get your token from [coda.io/account](https://coda.io/account) → API settings.
 
-```bash
-# Clone and build
-git clone https://github.com/nkpar/coda-mcp.git
-cd coda-mcp
-cargo build --release
+### 3. Configure Claude Desktop
 
-# Set your API token
-echo "CODA_API_TOKEN=your_token_here" > .env
+Add to `~/Library/Application Support/Claude/claude_desktop_config.json` (macOS) or `~/.config/claude/claude_desktop_config.json` (Linux):
 
-# Test it works
-export $(cat .env | xargs) && ./target/release/coda-mcp
+```json
+{
+  "mcpServers": {
+    "coda": {
+      "command": "coda-mcp",
+      "env": {
+        "CODA_API_TOKEN": "your_token_here"
+      }
+    }
+  }
+}
 ```
+
+### 4. Restart Claude Desktop
+
+The Coda tools will now be available.
 
 ## Installation
 
@@ -63,6 +69,16 @@ Binary will be at `./target/release/coda-mcp`
 ### Pre-built Binaries
 
 Check the [Releases](https://github.com/nkpar/coda-mcp/releases) page.
+
+### One-Click Install Script
+
+For Claude Desktop with automatic configuration:
+
+```bash
+git clone https://github.com/nkpar/coda-mcp.git
+cd coda-mcp
+./scripts/install.sh
+```
 
 ## Configuration
 
