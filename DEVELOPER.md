@@ -2,78 +2,78 @@
 
 ## Overview
 
-MCP server для работы с Coda.io API. Позволяет читать и писать документы, таблицы, строки.
+MCP server for Coda.io API integration. Enables reading and writing documents, tables, and rows.
 
 ## Auth
 
-- Переменная окружения: `CODA_API_TOKEN`
+- Environment variable: `CODA_API_TOKEN`
 - Header: `Authorization: Bearer {token}`
 - Base URL: `https://coda.io/apis/v1`
 
 ## Tools
 
 ### list_docs
-Список доступных документов.
-- `limit: int = 50` — макс количество
-- `query: str = ""` — фильтр по имени
+List available documents.
+- `limit: int = 50` — max count
+- `query: str = ""` — filter by name
 
 ### get_doc
-Метаданные документа.
-- `doc_id: str` — ID документа
+Get document metadata.
+- `doc_id: str` — document ID
 
 ### list_pages
-Страницы в документе.
+List pages in a document.
 - `doc_id: str`
 
 ### get_page
-Контент страницы (HTML). Использует async export workflow для получения контента canvas-страниц.
+Get page content (HTML). Uses async export workflow for canvas pages.
 - `doc_id: str`
 - `page_id: str`
 
 **Workflow:**
-1. POST `/docs/{doc_id}/pages/{page_id}/export` с `{"outputFormat": "html"}`
-2. Poll GET `/docs/{doc_id}/pages/{page_id}/export/{export_id}` до статуса `complete`
-3. Download контент по `downloadLink`
+1. POST `/docs/{doc_id}/pages/{page_id}/export` with `{"outputFormat": "html"}`
+2. Poll GET `/docs/{doc_id}/pages/{page_id}/export/{export_id}` until status is `complete`
+3. Download content from `downloadLink`
 
 Max polling: 30 attempts, 1s interval (30s timeout)
 
 ### list_tables
-Таблицы в документе.
+List tables in a document.
 - `doc_id: str`
 
 ### get_table
-Метаданные таблицы.
+Get table metadata.
 - `doc_id: str`
 - `table_id: str`
 
 ### list_columns
-Колонки таблицы.
+List table columns.
 - `doc_id: str`
 - `table_id: str`
 
 ### get_rows
-Строки таблицы.
+Get table rows.
 - `doc_id: str`
 - `table_id: str`
 - `limit: int = 100`
-- `query: str = ""` — фильтр в синтаксисе Coda формул
+- `query: str = ""` — filter using Coda formula syntax
 - Query param: `useColumnNames=true`
 
 ### get_row
-Одна строка.
+Get a single row.
 - `doc_id: str`
 - `table_id: str`
 - `row_id: str`
 
 ### add_row
-Добавить строку.
+Add a new row.
 - `doc_id: str`
 - `table_id: str`
 - `cells: dict` — `{column_name: value}`
 - POST body: `{"rows": [{"cells": [{"column": k, "value": v}, ...]}]}`
 
 ### update_row
-Обновить строку.
+Update an existing row.
 - `doc_id: str`
 - `table_id: str`
 - `row_id: str`
@@ -81,37 +81,37 @@ Max polling: 30 attempts, 1s interval (30s timeout)
 - PUT body: `{"row": {"cells": [{"column": k, "value": v}, ...]}}`
 
 ### delete_row
-Удалить строку.
+Delete a row.
 - `doc_id: str`
 - `table_id: str`
 - `row_id: str`
 
 ### search_docs
-Поиск по документам.
+Search documents.
 - `query: str`
 
 ### create_doc
-Создать новый документ. Опционально можно указать папку, шаблон (исходный документ) или таймзону.
-- `title: str` — название документа
-- `folder_id: str = null` — ID папки (опционально)
-- `source_doc: str = null` — ID документа-шаблона для копирования (опционально)
-- `timezone: str = null` — таймзона (опционально, напр. "America/Los_Angeles")
+Create a new document. Optionally specify folder, template (source document), or timezone.
+- `title: str` — document title
+- `folder_id: str = null` — folder ID (optional)
+- `source_doc: str = null` — template document ID to copy from (optional)
+- `timezone: str = null` — timezone (optional, e.g., "America/Los_Angeles")
 
 ### delete_doc
-Удалить документ. Действие необратимо.
-- `doc_id: str` — ID документа для удаления
+Delete a document. This action is permanent.
+- `doc_id: str` — document ID to delete
 
 ### list_formulas
-Именованные формулы в документе.
+List named formulas in a document.
 - `doc_id: str`
 
 ### get_formula
-Значение формулы.
+Get formula value.
 - `doc_id: str`
 - `formula_id: str`
 
 ### list_controls
-Контролы (кнопки, слайдеры).
+List controls (buttons, sliders).
 - `doc_id: str`
 
 ## API Endpoints
@@ -140,13 +140,13 @@ GET  /docs/{doc_id}/controls
 
 ## Stack
 
-- языки со строгой типизацией
+- Rust with strong typing
 
 ## Notes
 
-- Все ответы JSON
+- All responses are JSON
 - Row query syntax: `'ColumnName:"value"'`
-- useColumnNames=true возвращает имена колонок вместо ID
+- `useColumnNames=true` returns column names instead of IDs
 
 ## Developer Notes
 

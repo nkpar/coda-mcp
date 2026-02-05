@@ -1,9 +1,16 @@
 //! End-to-end tests for Coda MCP server
 //!
-//! These tests require a valid CODA_API_TOKEN environment variable.
-//! Run with: cargo test --test e2e_tests -- --ignored --test-threads=1
+//! These tests require a valid `CODA_API_TOKEN` environment variable.
+//! Run with: `cargo test --test e2e_tests -- --ignored --test-threads=1`
 //!
-//! To run: export $(cat .env | xargs) && cargo test --test e2e_tests -- --ignored --test-threads=1
+//! To run: `export $(cat .env | xargs) && cargo test --test e2e_tests -- --ignored --test-threads=1`
+
+#![allow(clippy::manual_let_else)]
+#![allow(clippy::single_match_else)]
+#![allow(clippy::uninlined_format_args)]
+#![allow(clippy::unused_async)]
+#![allow(clippy::map_unwrap_or)]
+#![allow(clippy::redundant_closure_for_method_calls)]
 
 use std::env;
 

@@ -134,7 +134,7 @@ mod tests {
 
     #[test]
     fn test_list_docs_params_defaults() {
-        let json = r#"{}"#;
+        let json = r"{}";
         let params: ListDocsParams = serde_json::from_str(json).unwrap();
         assert!(params.limit.is_none());
         assert!(params.query.is_none());

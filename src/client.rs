@@ -491,7 +491,7 @@ mod tests {
             // Should fail with connection error, NOT untrusted host error
             match result {
                 Err(CodaError::Api { body, .. }) if body.contains("Untrusted") => {
-                    panic!("URL {} should be trusted but was rejected", url);
+                    panic!("URL {url} should be trusted but was rejected");
                 }
                 _ => {} // Any other error (e.g., connection failure) is fine
             }
