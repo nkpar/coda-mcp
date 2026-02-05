@@ -5,8 +5,17 @@ pub enum CodaError {
     #[error("HTTP request failed: {0}")]
     Request(#[from] reqwest::Error),
 
-    #[error("Rate limited by Coda API")]
+    #[error("Rate limited by Coda API. Please wait and try again.")]
     RateLimited,
+
+    #[error("Permission denied. Your API token does not have write access. Generate a new token at https://coda.io/account with write permissions enabled.")]
+    Forbidden,
+
+    #[error("Not found. The document, table, or resource does not exist or you don't have access to it.")]
+    NotFound,
+
+    #[error("Unauthorized. Your API token is invalid or expired. Check your token at https://coda.io/account")]
+    Unauthorized,
 
     #[error("API error {status}: {body}")]
     Api { status: u16, body: String },
@@ -28,16 +37,37 @@ mod tests {
     #[test]
     fn test_rate_limited_error_display() {
         let err = CodaError::RateLimited;
-        assert_eq!(err.to_string(), "Rate limited by Coda API");
+        assert!(err.to_string().contains("Rate limited"));
+    }
+
+    #[test]
+    fn test_forbidden_error_display() {
+        let err = CodaError::Forbidden;
+        assert!(err.to_string().contains("Permission denied"));
+        assert!(err.to_string().contains("write access"));
+        assert!(err.to_string().contains("coda.io/account"));
+    }
+
+    #[test]
+    fn test_not_found_error_display() {
+        let err = CodaError::NotFound;
+        assert!(err.to_string().contains("Not found"));
+    }
+
+    #[test]
+    fn test_unauthorized_error_display() {
+        let err = CodaError::Unauthorized;
+        assert!(err.to_string().contains("Unauthorized"));
+        assert!(err.to_string().contains("invalid or expired"));
     }
 
     #[test]
     fn test_api_error_display() {
         let err = CodaError::Api {
-            status: 404,
-            body: "Not found".to_string(),
+            status: 500,
+            body: "Internal error".to_string(),
         };
-        assert_eq!(err.to_string(), "API error 404: Not found");
+        assert_eq!(err.to_string(), "API error 500: Internal error");
     }
 
     #[test]

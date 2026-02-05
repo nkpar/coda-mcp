@@ -26,13 +26,39 @@ cargo test --test e2e_tests -- --ignored --test-threads=1
 - Run `cargo clippy` and fix any warnings
 - Add tests for new functionality
 
+## Commit Messages
+
+Use concise commit messages:
+- `feat: add new feature`
+- `fix: resolve bug`
+- `docs: update readme`
+- `refactor: improve code structure`
+- `test: add tests`
+- `ci: update workflow`
+- `deps: update dependencies`
+
 ## Pull Requests
 
 1. Fork the repository
-2. Create a feature branch
+2. Create a feature branch from `main`
 3. Make your changes
 4. Run tests and linting
 5. Submit a pull request
+
+### Required Checks
+
+All PRs must pass:
+- `cargo fmt --check`
+- `cargo clippy -- -D warnings`
+- `cargo test`
+- Security audit
+
+### Branch Protection
+
+The `main` branch requires:
+- PR review before merging
+- All CI checks passing
+- Up-to-date with base branch
 
 ## Reporting Issues
 

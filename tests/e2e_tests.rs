@@ -390,4 +390,89 @@ mod e2e {
 
         assert_eq!(resp.status(), 404, "Expected 404 for nonexistent doc");
     }
+
+    #[tokio::test]
+    #[ignore = "requires CODA_API_TOKEN - creates and deletes a real document"]
+    async fn test_create_and_delete_doc() {
+        if skip_if_no_token() {
+            return;
+        }
+
+        let (client, token) = get_client().await;
+
+        // Create a new document
+        let create_resp = client
+            .post(format!("{BASE_URL}/docs"))
+            .header("Authorization", format!("Bearer {token}"))
+            .header("Content-Type", "application/json")
+            .json(&serde_json::json!({
+                "title": "E2E Test Document - Safe to Delete"
+            }))
+            .send()
+            .await
+            .unwrap();
+
+        if create_resp.status() == 429 {
+            println!("Rate limited on create, skipping test");
+            return;
+        }
+
+        assert!(
+            create_resp.status().is_success(),
+            "create_doc failed: {}",
+            create_resp.status()
+        );
+
+        let create_body: serde_json::Value = create_resp.json().await.unwrap();
+        let doc_id = create_body["id"].as_str().expect("Expected doc id");
+        println!("Created document: {} ({})", create_body["name"], doc_id);
+
+        // Verify we can get the document
+        let get_resp = client
+            .get(format!("{BASE_URL}/docs/{doc_id}"))
+            .header("Authorization", format!("Bearer {token}"))
+            .send()
+            .await
+            .unwrap();
+
+        assert!(
+            get_resp.status().is_success(),
+            "get_doc failed: {}",
+            get_resp.status()
+        );
+
+        // Delete the document
+        let delete_resp = client
+            .delete(format!("{BASE_URL}/docs/{doc_id}"))
+            .header("Authorization", format!("Bearer {token}"))
+            .send()
+            .await
+            .unwrap();
+
+        assert!(
+            delete_resp.status().is_success() || delete_resp.status() == 202,
+            "delete_doc failed: {}",
+            delete_resp.status()
+        );
+        println!("Deleted document: {}", doc_id);
+
+        // Verify the document is gone (should return 404)
+        // Note: There may be a delay before the API reflects the deletion
+        tokio::time::sleep(tokio::time::Duration::from_secs(2)).await;
+
+        let verify_resp = client
+            .get(format!("{BASE_URL}/docs/{doc_id}"))
+            .header("Authorization", format!("Bearer {token}"))
+            .send()
+            .await
+            .unwrap();
+
+        assert_eq!(
+            verify_resp.status(),
+            404,
+            "Document should be deleted (404), got: {}",
+            verify_resp.status()
+        );
+        println!("Verified document is deleted");
+    }
 }

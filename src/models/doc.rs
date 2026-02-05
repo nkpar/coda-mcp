@@ -44,6 +44,27 @@ pub struct SearchDocsParams {
     pub query: String,
 }
 
+#[derive(Debug, Serialize, Deserialize, JsonSchema)]
+pub struct CreateDocParams {
+    /// Title for the new document
+    pub title: String,
+    /// Folder ID to create document in (optional)
+    #[serde(rename = "folderId", skip_serializing_if = "Option::is_none")]
+    pub folder_id: Option<String>,
+    /// Source document ID to copy from (optional, for templates)
+    #[serde(rename = "sourceDoc", skip_serializing_if = "Option::is_none")]
+    pub source_doc: Option<String>,
+    /// Timezone for the document (optional, e.g., `America/Los_Angeles`)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub timezone: Option<String>,
+}
+
+#[derive(Debug, Deserialize, JsonSchema)]
+pub struct DeleteDocParams {
+    /// The document ID to delete
+    pub doc_id: String,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -125,5 +146,52 @@ mod tests {
         let params: ListDocsParams = serde_json::from_str(json).unwrap();
         assert_eq!(params.limit, Some(10));
         assert_eq!(params.query, Some("test".to_string()));
+    }
+
+    #[test]
+    fn test_create_doc_params_minimal() {
+        let json = r#"{"title": "My New Doc"}"#;
+        let params: CreateDocParams = serde_json::from_str(json).unwrap();
+        assert_eq!(params.title, "My New Doc");
+        assert!(params.folder_id.is_none());
+        assert!(params.source_doc.is_none());
+        assert!(params.timezone.is_none());
+    }
+
+    #[test]
+    fn test_create_doc_params_full() {
+        let json = r#"{
+            "title": "My New Doc",
+            "folderId": "folder123",
+            "sourceDoc": "template456",
+            "timezone": "America/Los_Angeles"
+        }"#;
+        let params: CreateDocParams = serde_json::from_str(json).unwrap();
+        assert_eq!(params.title, "My New Doc");
+        assert_eq!(params.folder_id, Some("folder123".to_string()));
+        assert_eq!(params.source_doc, Some("template456".to_string()));
+        assert_eq!(params.timezone, Some("America/Los_Angeles".to_string()));
+    }
+
+    #[test]
+    fn test_create_doc_params_serialize_minimal() {
+        let params = CreateDocParams {
+            title: "Test".to_string(),
+            folder_id: None,
+            source_doc: None,
+            timezone: None,
+        };
+        let json = serde_json::to_string(&params).unwrap();
+        assert!(json.contains("\"title\":\"Test\""));
+        assert!(!json.contains("folderId"));
+        assert!(!json.contains("sourceDoc"));
+        assert!(!json.contains("timezone"));
+    }
+
+    #[test]
+    fn test_delete_doc_params() {
+        let json = r#"{"doc_id": "doc123"}"#;
+        let params: DeleteDocParams = serde_json::from_str(json).unwrap();
+        assert_eq!(params.doc_id, "doc123");
     }
 }

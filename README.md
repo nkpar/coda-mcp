@@ -13,12 +13,39 @@ MCP (Model Context Protocol) server for [Coda.io](https://coda.io) API integrati
 - Async export workflow for canvas pages
 - Rate limit handling
 
+## Quick Start
+
+### One-Click Install (Claude Desktop)
+
+```bash
+git clone https://github.com/nkpar/coda-mcp.git
+cd coda-mcp
+./scripts/install.sh
+```
+
+The script builds the binary, prompts for your Coda API token, and configures Claude Desktop automatically.
+
+### Manual Setup
+
+```bash
+# Clone and build
+git clone https://github.com/nkpar/coda-mcp.git
+cd coda-mcp
+cargo build --release
+
+# Set your API token
+echo "CODA_API_TOKEN=your_token_here" > .env
+
+# Test it works
+export $(cat .env | xargs) && ./target/release/coda-mcp
+```
+
 ## Installation
 
 ### From Source
 
 ```bash
-git clone https://github.com/parity-asia/coda-mcp.git
+git clone https://github.com/nkpar/coda-mcp.git
 cd coda-mcp
 cargo build --release
 ```
@@ -27,13 +54,15 @@ Binary will be at `./target/release/coda-mcp`
 
 ### Pre-built Binaries
 
-Check the [Releases](https://github.com/parity-asia/coda-mcp/releases) page.
+Check the [Releases](https://github.com/nkpar/coda-mcp/releases) page.
 
 ## Configuration
 
 ### 1. Get API Token
 
 Get your Coda API token from [coda.io/account](https://coda.io/account) → API settings.
+
+**Important:** For write operations (`create_doc`, `delete_doc`, `add_row`, `update_row`, `delete_row`), ensure your token has write permissions enabled. Read-only tokens will return 403 Forbidden for these operations.
 
 ### 2. Configure MCP Client
 
@@ -82,6 +111,8 @@ Get your Coda API token from [coda.io/account](https://coda.io/account) → API 
 | `list_docs` | List available documents |
 | `get_doc` | Get document details |
 | `search_docs` | Search documents by name |
+| `create_doc` | Create a new document (optional: folder, template, timezone) |
+| `delete_doc` | Delete a document (permanent) |
 | `list_pages` | List pages in a document |
 | `get_page` | Get page content (HTML) |
 | `list_tables` | List tables in a document |
@@ -101,6 +132,15 @@ Get your Coda API token from [coda.io/account](https://coda.io/account) → API 
 ```
 # List all documents
 list_docs
+
+# Create a new document
+create_doc title="My New Doc"
+
+# Create from template in specific folder
+create_doc title="Project Plan" folder_id="fl-abc" source_doc="template-xyz"
+
+# Delete a document (permanent!)
+delete_doc doc_id="AbCdEfGh"
 
 # Get rows from a table
 get_rows doc_id="AbCdEfGh" table_id="grid-xyz" limit=50
@@ -126,20 +166,23 @@ Write operations return HTTP 202 (queued). Changes may take a few seconds to app
 ## Development
 
 ```bash
-# Run tests
+# Build
+cargo build --release
+
+# Run unit & integration tests
 cargo test
+
+# Run E2E tests (requires write-enabled API token)
+export $(cat .env | xargs) && cargo test --test e2e_tests -- --ignored
 
 # Run with debug logging
 RUST_LOG=debug cargo run
 
-# Format code
-cargo fmt
-
-# Lint
-cargo clippy
+# Format & lint
+cargo fmt && cargo clippy
 ```
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) for more details.
+See [DEVELOPER.md](DEVELOPER.md) for API details and [CONTRIBUTING.md](CONTRIBUTING.md) for contribution guidelines.
 
 ## License
 

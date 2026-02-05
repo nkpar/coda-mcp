@@ -544,3 +544,150 @@ async fn test_unauthorized_error() {
 
     assert_eq!(resp.status(), 401);
 }
+
+#[tokio::test]
+async fn test_create_doc_minimal() {
+    let mock_server = common::setup_mock_server().await;
+
+    Mock::given(method("POST"))
+        .and(path("/docs"))
+        .respond_with(ResponseTemplate::new(201).set_body_json(serde_json::json!({
+            "id": "new-doc-123",
+            "name": "My New Document",
+            "href": "https://coda.io/apis/v1/docs/new-doc-123",
+            "createdAt": "2024-01-15T10:00:00Z"
+        })))
+        .mount(&mock_server)
+        .await;
+
+    let client = reqwest::Client::new();
+    let resp = client
+        .post(format!("{}/docs", mock_server.uri()))
+        .header("Authorization", "Bearer test_token")
+        .header("Content-Type", "application/json")
+        .json(&serde_json::json!({"title": "My New Document"}))
+        .send()
+        .await
+        .unwrap();
+
+    assert_eq!(resp.status(), 201);
+    let body: serde_json::Value = resp.json().await.unwrap();
+    assert_eq!(body["id"], "new-doc-123");
+    assert_eq!(body["name"], "My New Document");
+}
+
+#[tokio::test]
+async fn test_create_doc_full() {
+    let mock_server = common::setup_mock_server().await;
+
+    Mock::given(method("POST"))
+        .and(path("/docs"))
+        .respond_with(ResponseTemplate::new(201).set_body_json(serde_json::json!({
+            "id": "new-doc-456",
+            "name": "Document from Template",
+            "href": "https://coda.io/apis/v1/docs/new-doc-456",
+            "folderId": "folder-abc",
+            "createdAt": "2024-01-15T10:00:00Z"
+        })))
+        .mount(&mock_server)
+        .await;
+
+    let client = reqwest::Client::new();
+    let resp = client
+        .post(format!("{}/docs", mock_server.uri()))
+        .header("Authorization", "Bearer test_token")
+        .header("Content-Type", "application/json")
+        .json(&serde_json::json!({
+            "title": "Document from Template",
+            "folderId": "folder-abc",
+            "sourceDoc": "template-xyz",
+            "timezone": "Europe/London"
+        }))
+        .send()
+        .await
+        .unwrap();
+
+    assert_eq!(resp.status(), 201);
+    let body: serde_json::Value = resp.json().await.unwrap();
+    assert_eq!(body["id"], "new-doc-456");
+    assert_eq!(body["folderId"], "folder-abc");
+}
+
+#[tokio::test]
+async fn test_create_doc_from_template() {
+    let mock_server = common::setup_mock_server().await;
+
+    Mock::given(method("POST"))
+        .and(path("/docs"))
+        .respond_with(ResponseTemplate::new(201).set_body_json(serde_json::json!({
+            "id": "copied-doc-789",
+            "name": "Copy of Template",
+            "href": "https://coda.io/apis/v1/docs/copied-doc-789",
+            "createdAt": "2024-01-15T10:00:00Z"
+        })))
+        .mount(&mock_server)
+        .await;
+
+    let client = reqwest::Client::new();
+    let resp = client
+        .post(format!("{}/docs", mock_server.uri()))
+        .header("Authorization", "Bearer test_token")
+        .header("Content-Type", "application/json")
+        .json(&serde_json::json!({
+            "title": "Copy of Template",
+            "sourceDoc": "original-template-id"
+        }))
+        .send()
+        .await
+        .unwrap();
+
+    assert_eq!(resp.status(), 201);
+    let body: serde_json::Value = resp.json().await.unwrap();
+    assert_eq!(body["id"], "copied-doc-789");
+}
+
+#[tokio::test]
+async fn test_delete_doc_success() {
+    let mock_server = common::setup_mock_server().await;
+
+    Mock::given(method("DELETE"))
+        .and(path("/docs/doc-to-delete"))
+        .respond_with(ResponseTemplate::new(202))
+        .mount(&mock_server)
+        .await;
+
+    let client = reqwest::Client::new();
+    let resp = client
+        .delete(format!("{}/docs/doc-to-delete", mock_server.uri()))
+        .header("Authorization", "Bearer test_token")
+        .send()
+        .await
+        .unwrap();
+
+    assert_eq!(resp.status(), 202);
+}
+
+#[tokio::test]
+async fn test_delete_doc_not_found() {
+    let mock_server = common::setup_mock_server().await;
+
+    Mock::given(method("DELETE"))
+        .and(path("/docs/nonexistent-doc"))
+        .respond_with(ResponseTemplate::new(404).set_body_json(serde_json::json!({
+            "statusCode": 404,
+            "statusMessage": "Not Found",
+            "message": "Document not found"
+        })))
+        .mount(&mock_server)
+        .await;
+
+    let client = reqwest::Client::new();
+    let resp = client
+        .delete(format!("{}/docs/nonexistent-doc", mock_server.uri()))
+        .header("Authorization", "Bearer test_token")
+        .send()
+        .await
+        .unwrap();
+
+    assert_eq!(resp.status(), 404);
+}
