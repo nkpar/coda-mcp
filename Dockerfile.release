@@ -1,0 +1,12 @@
+FROM debian:bookworm-slim
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
+ARG TARGETPLATFORM
+COPY docker-build/${TARGETPLATFORM}/coda-mcp /usr/local/bin/
+
+LABEL io.modelcontextprotocol.server.name="io.github.nkpar/coda"
+
+ENTRYPOINT ["coda-mcp"]

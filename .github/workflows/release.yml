@@ -73,12 +73,19 @@ jobs:
           - os: ubuntu-latest
             target: x86_64-unknown-linux-gnu
             artifact: coda-mcp-linux-x86_64
+            use_cross: false
+          - os: ubuntu-latest
+            target: aarch64-unknown-linux-gnu
+            artifact: coda-mcp-linux-aarch64
+            use_cross: true
           - os: macos-latest
             target: x86_64-apple-darwin
             artifact: coda-mcp-macos-x86_64
+            use_cross: false
           - os: macos-latest
             target: aarch64-apple-darwin
             artifact: coda-mcp-macos-aarch64
+            use_cross: false
 
     steps:
       - uses: actions/checkout@v6
@@ -91,8 +98,17 @@ jobs:
         with:
           shared-key: ${{ matrix.target == 'x86_64-unknown-linux-gnu' && 'ubuntu' || format('macos-{0}', matrix.target) }}
 
+      - name: Install cross
+        if: matrix.use_cross
+        run: cargo install cross --git https://github.com/cross-rs/cross
+
       - name: Build
-        run: cargo build --release --target ${{ matrix.target }}
+        run: |
+          if [ "${{ matrix.use_cross }}" = "true" ]; then
+            cross build --release --target ${{ matrix.target }}
+          else
+            cargo build --release --target ${{ matrix.target }}
+          fi
 
       - name: Package
         run: |
@@ -112,13 +128,26 @@ jobs:
 
   docker:
     name: Build Docker Image
-    needs: [test, security]
+    needs: build
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
 
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3
+      - uses: actions/download-artifact@v7
+        with:
+          name: coda-mcp-linux-x86_64
+          path: docker-build/linux/amd64
+
+      - uses: actions/download-artifact@v7
+        with:
+          name: coda-mcp-linux-aarch64
+          path: docker-build/linux/arm64
+
+      - name: Prepare binaries
+        run: |
+          mv docker-build/linux/amd64/coda-mcp-linux-x86_64 docker-build/linux/amd64/coda-mcp
+          mv docker-build/linux/arm64/coda-mcp-linux-aarch64 docker-build/linux/arm64/coda-mcp
+          chmod +x docker-build/linux/amd64/coda-mcp docker-build/linux/arm64/coda-mcp
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -138,13 +167,12 @@ jobs:
         uses: docker/build-push-action@v6
         with:
           context: .
+          file: Dockerfile.release
           platforms: linux/amd64,linux/arm64
           push: true
           tags: |
             ghcr.io/${{ github.repository }}:${{ steps.version.outputs.version }}
             ghcr.io/${{ github.repository }}:latest
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
 
   publish:
     name: Publish to crates.io
