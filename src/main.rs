@@ -23,12 +23,12 @@ mod models;
 use client::CodaClient;
 use config::Config;
 use models::{
-    AddRowParams, ColumnList, ControlList, CreateDocParams, DeleteDocParams, DeleteRowParams,
-    Doc, DocList, ExportRequest, ExportResponse, Formula, FormulaList, GetDocParams,
-    GetFormulaParams, GetPageParams, GetRowParams, GetRowsParams, GetTableParams,
-    ListColumnsParams, ListControlsParams, ListDocsParams, ListFormulasParams, ListPagesParams,
-    ListTablesParams, Page, PageList, Row, RowList, RowMutationResponse, SearchDocsParams, Table,
-    TableList, UpdateRowParams,
+    AddRowParams, ColumnList, ControlList, CreateDocParams, DeleteDocParams, DeleteRowParams, Doc,
+    DocList, ExportRequest, ExportResponse, Formula, FormulaList, GetDocParams, GetFormulaParams,
+    GetPageParams, GetRowParams, GetRowsParams, GetTableParams, ListColumnsParams,
+    ListControlsParams, ListDocsParams, ListFormulasParams, ListPagesParams, ListTablesParams,
+    Page, PageList, Row, RowList, RowMutationResponse, SearchDocsParams, Table, TableList,
+    UpdateRowParams,
 };
 
 #[derive(Clone)]

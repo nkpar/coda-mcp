@@ -30,6 +30,7 @@ pub struct PageList {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg(test)]
 pub struct PageContent {
     pub id: String,
     pub name: String,
