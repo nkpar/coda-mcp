@@ -206,6 +206,7 @@ jobs:
       - uses: actions/download-artifact@v7
         with:
           path: artifacts
+          pattern: coda-mcp-*
 
       - name: Create Release
         uses: softprops/action-gh-release@v2
