@@ -1,10 +1,16 @@
 use rmcp::{
     handler::server::{router::tool::ToolRouter, wrapper::Parameters},
-    model::*,
+    model::{
+        CallToolResult, Content, Implementation, ProtocolVersion, ServerCapabilities, ServerInfo,
+    },
     tool, tool_handler, tool_router,
     transport::stdio,
     ErrorData as McpError, ServerHandler, ServiceExt,
 };
+use std::fmt::Write as _;
+
+const MAX_POLL_ATTEMPTS: u32 = 30;
+const POLL_INTERVAL_SECS: u64 = 1;
 use std::sync::Arc;
 use std::time::Duration;
 use tracing_subscriber::EnvFilter;
@@ -16,7 +22,14 @@ mod models;
 
 use client::CodaClient;
 use config::Config;
-use models::*;
+use models::{
+    AddRowParams, ColumnList, ControlList, CreateDocParams, DeleteDocParams, DeleteRowParams,
+    Doc, DocList, ExportRequest, ExportResponse, Formula, FormulaList, GetDocParams,
+    GetFormulaParams, GetPageParams, GetRowParams, GetRowsParams, GetTableParams,
+    ListColumnsParams, ListControlsParams, ListDocsParams, ListFormulasParams, ListPagesParams,
+    ListTablesParams, Page, PageList, Row, RowList, RowMutationResponse, SearchDocsParams, Table,
+    TableList, UpdateRowParams,
+};
 
 #[derive(Clone)]
 pub struct CodaMcpServer {
@@ -40,11 +53,11 @@ impl CodaMcpServer {
         &self,
         Parameters(params): Parameters<ListDocsParams>,
     ) -> Result<CallToolResult, McpError> {
-        let limit = params.limit.unwrap_or(50);
+        let limit = params.limit.unwrap_or(50).min(1000);
         let mut path = format!("/docs?limit={limit}");
 
         if let Some(query) = &params.query {
-            path.push_str(&format!("&query={}", urlencoding::encode(query)));
+            let _ = write!(path, "&query={}", urlencoding::encode(query));
         }
 
         tracing::info!("list_docs: limit={}, query={:?}", limit, params.query);
@@ -116,6 +129,56 @@ impl CodaMcpServer {
         ))]))
     }
 
+    #[tool(
+        description = "Create a new Coda document. Optionally specify a folder, source document (template), or timezone."
+    )]
+    async fn create_doc(
+        &self,
+        Parameters(params): Parameters<CreateDocParams>,
+    ) -> Result<CallToolResult, McpError> {
+        tracing::info!(
+            "create_doc: title={}, folder_id={:?}, source_doc={:?}, timezone={:?}",
+            params.title,
+            params.folder_id,
+            params.source_doc,
+            params.timezone
+        );
+
+        let doc: Doc = match self.client.post("/docs", &params).await {
+            Ok(doc) => doc,
+            Err(e) => {
+                return Ok(CallToolResult::error(vec![Content::text(e.to_string())]));
+            }
+        };
+
+        let json = serde_json::to_string_pretty(&doc)
+            .map_err(|e| McpError::internal_error(e.to_string(), None))?;
+
+        Ok(CallToolResult::success(vec![Content::text(format!(
+            "Document created successfully!\n\nName: {}\nID: {}\n\n```json\n{}\n```",
+            doc.name, doc.id, json
+        ))]))
+    }
+
+    #[tool(description = "Delete a Coda document. This action is permanent and cannot be undone.")]
+    async fn delete_doc(
+        &self,
+        Parameters(params): Parameters<DeleteDocParams>,
+    ) -> Result<CallToolResult, McpError> {
+        let path = format!("/docs/{}", params.doc_id);
+
+        tracing::info!("delete_doc: doc_id={}", params.doc_id);
+
+        if let Err(e) = self.client.delete(&path).await {
+            return Ok(CallToolResult::error(vec![Content::text(e.to_string())]));
+        }
+
+        Ok(CallToolResult::success(vec![Content::text(format!(
+            "Document '{}' deleted successfully.",
+            params.doc_id
+        ))]))
+    }
+
     // === Page Tools ===
 
     #[tool(description = "List all pages in a Coda document.")]
@@ -179,9 +242,6 @@ impl CodaMcpServer {
             "/docs/{}/pages/{}/export/{}",
             params.doc_id, params.page_id, export.id
         );
-
-        const MAX_POLL_ATTEMPTS: u32 = 30;
-        const POLL_INTERVAL_SECS: u64 = 1;
 
         for attempt in 1..=MAX_POLL_ATTEMPTS {
             tracing::info!(
@@ -248,7 +308,7 @@ impl CodaMcpServer {
         Err(McpError::internal_error(
             format!(
                 "Export timed out after {} seconds",
-                MAX_POLL_ATTEMPTS as u64 * POLL_INTERVAL_SECS
+                u64::from(MAX_POLL_ATTEMPTS) * POLL_INTERVAL_SECS
             ),
             None,
         ))
@@ -345,14 +405,14 @@ impl CodaMcpServer {
         &self,
         Parameters(params): Parameters<GetRowsParams>,
     ) -> Result<CallToolResult, McpError> {
-        let limit = params.limit.unwrap_or(100);
+        let limit = params.limit.unwrap_or(100).min(1000);
         let mut path = format!(
             "/docs/{}/tables/{}/rows?limit={}&useColumnNames=true",
             params.doc_id, params.table_id, limit
         );
 
         if let Some(query) = &params.query {
-            path.push_str(&format!("&query={}", urlencoding::encode(query)));
+            let _ = write!(path, "&query={}", urlencoding::encode(query));
         }
 
         tracing::info!(

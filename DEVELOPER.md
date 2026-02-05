@@ -90,6 +90,17 @@ Max polling: 30 attempts, 1s interval (30s timeout)
 Поиск по документам.
 - `query: str`
 
+### create_doc
+Создать новый документ. Опционально можно указать папку, шаблон (исходный документ) или таймзону.
+- `title: str` — название документа
+- `folder_id: str = null` — ID папки (опционально)
+- `source_doc: str = null` — ID документа-шаблона для копирования (опционально)
+- `timezone: str = null` — таймзона (опционально, напр. "America/Los_Angeles")
+
+### delete_doc
+Удалить документ. Действие необратимо.
+- `doc_id: str` — ID документа для удаления
+
 ### list_formulas
 Именованные формулы в документе.
 - `doc_id: str`
@@ -107,7 +118,9 @@ Max polling: 30 attempts, 1s interval (30s timeout)
 
 ```
 GET  /docs
+POST /docs
 GET  /docs/{doc_id}
+DELETE /docs/{doc_id}
 GET  /docs/{doc_id}/pages
 GET  /docs/{doc_id}/pages/{page_id}
 POST /docs/{doc_id}/pages/{page_id}/export
@@ -162,6 +175,19 @@ Run with verbose logging:
 RUST_LOG=info CODA_API_TOKEN=xxx ./target/release/coda-mcp 2>&1 | tee /tmp/coda-debug.log
 ```
 
-The client logs all HTTP requests and responses at INFO level when debugging:
-- Request URL, Authorization header preview
-- Response status and headers
+The client logs HTTP request URLs at INFO level when debugging. Response status is logged at DEBUG level.
+
+### Security
+
+The following security measures are implemented:
+
+1. **Token redaction**: The `Config` struct implements custom `Debug` to redact the API token from log output
+2. **No token logging**: HTTP client does not log authorization headers or token previews
+3. **URL validation**: `download_raw()` validates that download URLs are from trusted hosts only:
+   - `coda.io`
+   - `codahosted.io`
+   - `storage.googleapis.com`
+4. **Limit bounds**: User-provided limits are capped at 1000 to prevent excessive resource usage
+5. **Install script security**:
+   - Token input is silent (`read -sp`)
+   - Config file permissions set to 600 (owner read/write only)
