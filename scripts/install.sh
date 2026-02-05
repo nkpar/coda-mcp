@@ -4,17 +4,10 @@ set -e
 echo "=== Coda MCP Installer for Claude Desktop ==="
 echo ""
 
-# 1. Build if needed
-if [ ! -f "target/release/coda-mcp" ]; then
-    echo "Building coda-mcp (release mode)..."
-    cargo build --release
-    echo "Build complete."
-else
-    echo "Binary already exists at target/release/coda-mcp"
-fi
-
-BINARY_PATH="$(pwd)/target/release/coda-mcp"
-echo "Binary path: $BINARY_PATH"
+# 1. Install via cargo
+echo "Installing coda-mcp from crates.io..."
+cargo install coda-mcp
+echo "Install complete."
 echo ""
 
 # 2. Find Claude Desktop config
@@ -36,7 +29,7 @@ echo "  3. Click 'Generate API token'"
 echo "  4. Enable write access if you need to modify data"
 echo ""
 read -sp "Enter your Coda API token: " CODA_TOKEN
-echo ""  # Add newline after silent input
+echo ""
 
 if [ -z "$CODA_TOKEN" ]; then
     echo "Error: Token cannot be empty"
@@ -55,19 +48,19 @@ mkdir -p "$CONFIG_DIR"
 
 if [ -f "$CONFIG_FILE" ]; then
     echo "Updating existing config..."
-    jq --arg bin "$BINARY_PATH" --arg token "$CODA_TOKEN" \
-       '.mcpServers.coda = {"command": $bin, "env": {"CODA_API_TOKEN": $token}}' \
+    jq --arg token "$CODA_TOKEN" \
+       '.mcpServers.coda = {"command": "coda-mcp", "env": {"CODA_API_TOKEN": $token}}' \
        "$CONFIG_FILE" > "$CONFIG_FILE.tmp" && mv "$CONFIG_FILE.tmp" "$CONFIG_FILE"
 else
     echo "Creating new config..."
-    echo "{\"mcpServers\":{\"coda\":{\"command\":\"$BINARY_PATH\",\"env\":{\"CODA_API_TOKEN\":\"$CODA_TOKEN\"}}}}" | jq . > "$CONFIG_FILE"
+    echo '{"mcpServers":{"coda":{"command":"coda-mcp","env":{"CODA_API_TOKEN":"'"$CODA_TOKEN"'"}}}}' | jq . > "$CONFIG_FILE"
 fi
 
 # Secure the config file (contains sensitive token)
 chmod 600 "$CONFIG_FILE"
 
 echo ""
-echo "✓ coda-mcp installed successfully!"
+echo "coda-mcp installed successfully!"
 echo ""
 echo "Next steps:"
 echo "  1. Restart Claude Desktop"
